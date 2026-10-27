@@ -1,6 +1,6 @@
 # Public-release privacy and validation notes
 
-Package: **0.3.18**, prepared 27 October 2026.
+Package: **0.3.19**, prepared 27 October 2026.
 
 ## Privacy changes
 
@@ -24,7 +24,7 @@ The dashboard still displays the installing Pi's MAC addresses locally. This is 
 
 The existing 0.3.10 receiver code has been exercised on the original field Pi. The new **public fresh-install workflow has not been run end-to-end on a Pi or a blank microSD**. Offline mocks do not verify Wi-Fi driver compatibility, USB power quality, decoder compilation on that hardware, phone rendering or live radio reception. Use a spare card and retain the known-working installation.
 
-An intermittent SDR stall was mitigated by detection/recovery; its hardware cause has not been conclusively identified. This package does not promise arbitrary power-loss safety. SondeHub weather uploader approval remains external and uncompleted. APRS-IS socket writes do not establish downstream map ingestion.
+An intermittent SDR stall was mitigated by detection/recovery; its hardware cause has not been conclusively identified. This package does not promise arbitrary power-loss safety. Direct SondeHub weather uploads are removed; DFM/RS41 decoding and coordinates remain local. APRS-IS socket writes do not establish downstream map ingestion.
 
 The release-signing public key and its fingerprint are intentionally public. Private signing keys/passwords are never included. Signed-channel publication requires a publisher signature; device enrollment and RF validation remain device-side checks.
 

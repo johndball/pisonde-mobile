@@ -66,19 +66,6 @@ class FieldTests(unittest.TestCase):
             self.packet('HORUS',self.horus(1))
         self.assertEqual(self.jobs()[0]['destination'],'amateur')
         self.assertNotIn('dev',json.loads(self.jobs()[0]['payload']))
-    def test_weather_requires_confirmation_and_rejects_jumps(self):
-        now=self.f.utc()
-        for seq in range(3):
-            raw=dict(id='DFM-123456789',datetime=self.f.stamp(now+timedelta(seconds=seq)),lat=38.,lon=-78.,alt=1000.,sats=8,subtype='0xD:DFM17',frame=seq)
-            self.packet('DFM',json.dumps(raw))
-        jobs=self.jobs();self.assertEqual(len(jobs),1)
-        out=json.loads(jobs[0]['payload']);self.assertEqual(out['serial'],'123456789');self.assertEqual(out['subtype'],'DFM17')
-        raw['lat']=40.;self.packet('DFM',json.dumps(raw));self.assertEqual(len(self.jobs()),1)
-        raw.update(id='X1234567',lat=38.,frame=19)
-        for seq in range(3):
-            raw['frame']=19+seq;raw['datetime']=self.f.stamp(now+timedelta(seconds=seq))
-            self.packet('RS41',json.dumps(raw))
-        out=json.loads(self.jobs()[-1]['payload']);self.assertEqual(out['type'],'RS41');self.assertEqual(out['frame'],21)
     def test_weather_stale_and_bad_position_withheld(self):
         for raw in (dict(id='X1234567',datetime=self.f.stamp(self.f.utc()-timedelta(hours=1)),lat=38.,lon=-78.,alt=1000,frame=1),
                     dict(id='DFM-123456789',datetime=self.f.stamp(self.f.utc()),lat=0.,lon=0.,alt=1000,sats=2)):
@@ -132,64 +119,6 @@ class FieldTests(unittest.TestCase):
             raw.update(fields)
             self.packet(mode,json.dumps(raw))
 
-    def test_weather_duplicate_frames_do_not_confirm_serial(self):
-        fixed=self.f.stamp(self.f.utc())
-        self.weather(datetime=fixed,frame=100)
-        self.assertEqual(self.jobs(),[])
-
-    def test_weather_repeated_confirmed_frame_is_not_reuploaded(self):
-        self.weather()
-        with self.m.database() as db:row=db.execute("SELECT * FROM receptions ORDER BY id DESC LIMIT 1").fetchone()
-        self.packet('DFM',row['raw_packet'])
-        self.assertEqual(len(self.jobs()),1)
-        with self.m.database() as db:self.assertEqual(db.execute('SELECT COUNT(*) FROM receptions').fetchone()[0],4)
-
-    def test_weather_validation_exports_exact_payload_even_after_expiry(self):
-        self.weather();job=self.jobs()[0]
-        with self.m.database() as db:db.execute("UPDATE upload_jobs SET status='expired'")
-        with patch.object(self.f.requests,'put') as send:
-            r=self.client.get('/weather-validation.jsonl?type=DFM')
-            self.assertEqual(r.status_code,200)
-            self.assertEqual(r.text,job['payload']+'\n');send.assert_not_called()
-        out=json.loads(r.text);self.assertEqual(out['software_name'],'PiSonde-Mobile')
-        self.assertNotIn('uploader_position',out)
-        self.assertEqual(self.client.get('/weather-validation.jsonl?type=RS41').text,'')
-        self.assertEqual(self.client.get('/weather-validation.jsonl?type=APRS').status_code,400)
-        report=self.client.get('/upload-report.json').json
-        self.assertEqual(report['weather_validation_samples']['DFM'],1)
-        self.assertEqual(report['destinations']['sondehub']['counts']['expired'],1)
-
-    def test_weather_sentinels_omitted_and_references_preserved(self):
-        self.weather('RS41',temp=-273.,humidity=-1.,pressure=-1.,vel_h=-9999.,vel_v=-9999.,batt=-1.,
-                     subtype='RS41-SGP',ref_datetime='GPS',ref_position='GPS',aux='AABB',bt=30)
-        out=json.loads(self.jobs()[0]['payload'])
-        for key in ('temp','humidity','pressure','vel_h','vel_v','batt'):self.assertNotIn(key,out)
-        self.assertEqual(out['ref_datetime'],'GPS');self.assertEqual(out['xdata'],'AABB')
-        self.assertEqual(out['subtype'],'RS41-SGP');self.assertEqual(out['burst_timer'],30)
-
-    def test_real_weather_batch_gzip_acknowledgment_and_payload_time(self):
-        self.weather('DFM');self.weather('RS41')
-        original=[json.loads(j['payload']) for j in self.jobs()]
-        class Reply:
-            status_code=200;text='ok'
-            def json(self):return {'message':'Data successfully uploaded'}
-        with patch.object(self.f.requests,'put',return_value=Reply()) as send:self.f.upload_cycle()
-        send.assert_called_once()
-        self.assertTrue(send.call_args.args[0].endswith('/sondes/telemetry'))
-        uploaded=json.loads(gzip.decompress(send.call_args.kwargs['data']))
-        self.assertEqual(uploaded,original)
-        self.assertEqual({j['status'] for j in self.jobs()},{'accepted'})
-        self.assertEqual({x['type'] for x in uploaded},{'DFM','RS41'})
-        self.assertTrue(all('dev' not in x and 'uploader_position' not in x for x in uploaded))
-
-    def test_partial_weather_rejection_never_marks_whole_batch_accepted(self):
-        self.weather('DFM');self.weather('RS41')
-        class Reply:
-            status_code=202;text='partially processed'
-            def json(self):return {'message':'some failed','errors':[{'error_message':'Invalid telemetry','payload':{'type':'DFM'}}]}
-        with patch.object(self.f.requests,'put',return_value=Reply()):self.f.upload_cycle()
-        self.assertEqual({j['status'] for j in self.jobs()},{'pending'})
-
     def test_sondehub_unrecognized_response_never_counts_accepted(self):
         class Reply:
             status_code=200;text='invalid response'
@@ -202,31 +131,74 @@ class FieldTests(unittest.TestCase):
         reply=Reply();reply.json=lambda:(_ for _ in ()).throw(ValueError('html'))
         with self.assertRaises(RuntimeError):self.f.validate_sondehub_response(reply,[{'type':'DFM'}])
 
-    def test_unknown_software_response_remains_visible_after_waiting(self):
-        self.weather()
-        class Reply:
-            status_code=202;text='unknown software'
-            def json(self):return {'errors':[{'error_message':'This software is unknown to us!'}]}
-        with patch.object(self.f.requests,'put',return_value=Reply()):self.f.upload_cycle()
-        self.f.upload_cycle() # Retry cooldown; global status can now say waiting.
-        report=self.client.get('/upload-report.json').json
-        dest=report['destinations']['sondehub']
-        self.assertIn('unknown to us',dest['last']['last_error'])
-        self.assertEqual(dest['counts'],{'pending':1})
+    def legacy_weather_job(self,status='pending'):
+        self.weather('RS41',count=1)
+        with self.m.database() as db:
+            ident=db.execute('SELECT MAX(id) FROM receptions').fetchone()[0]
+            db.execute('INSERT INTO upload_jobs(reception_id,destination,payload,status,created_utc) VALUES(?,?,?,?,?)',
+                       (ident,'sondehub','{"serial":"X1234567","frame":100}',status,self.f.stamp(self.f.utc())))
+        return ident
 
-    def test_endpoint_diagnostics_exercise_both_weather_types(self):
+    def test_weather_positions_remain_local_without_upload_jobs(self):
+        self.weather('DFM');self.weather('RS41')
+        self.assertEqual(self.jobs(),[])
+        with self.m.database() as db:
+            rows=db.execute('SELECT * FROM receptions').fetchall()
+        self.assertEqual(len(rows),6)
+        self.assertTrue(all(r['latitude']==38. and r['longitude']==-78. for r in rows))
+        self.assertIn('X1234567',self.client.get('/history.csv').text)
+        self.assertEqual(self.client.get('/track.gpx?protocol=DFM').text.count('<trkpt '),3)
+        with self.assertRaisesRegex(ValueError,'local-only'):
+            self.f.format_sonde(rows[0],self.f.SETTINGS)
+
+    def test_upgrade_disables_legacy_weather_queue_and_preserves_history(self):
+        self.legacy_weather_job()
+        self.f.create_schema();self.f.create_schema()
+        job=self.jobs()[0]
+        self.assertEqual(job['status'],'disabled');self.assertEqual(job['attempts'],0)
+        self.assertIn('local history retained',job['last_error'])
+        self.assertEqual(json.loads(job['payload'])['serial'],'X1234567')
+        with self.m.database() as db:self.assertEqual(db.execute('SELECT COUNT(*) FROM receptions').fetchone()[0],1)
+
+    def test_legacy_weather_is_never_sent_even_when_uploads_paused_or_reenabled(self):
+        self.legacy_weather_job()
+        self.f.SETTINGS['enabled']=False
+        with patch.object(self.f.requests,'put') as send:
+            self.f.upload_cycle();send.assert_not_called()
+        self.assertEqual(self.jobs()[0]['status'],'disabled')
+        self.f.SETTINGS['enabled']=True
+        self.packet()
+        with patch.object(self.f.requests,'put') as send,patch.object(self.f,'send_aprs') as aprs:
+            self.f.upload_cycle();send.assert_not_called();aprs.assert_called_once()
+        self.assertEqual([j['status'] for j in self.jobs()],['disabled','sent'])
+
+    def test_archival_weather_export_preserves_older_payload_without_uploading(self):
+        self.legacy_weather_job();self.f.create_schema()
+        with patch.object(self.f.requests,'put') as send:
+            result=self.client.get('/weather-validation.jsonl?type=RS41');send.assert_not_called()
+        self.assertEqual(result.text,self.jobs()[0]['payload']+'\n')
+        self.assertEqual(self.client.get('/weather-validation.jsonl?type=DFM').text,'')
+        self.assertEqual(self.client.get('/weather-validation.jsonl?type=APRS').status_code,400)
+        report=self.client.get('/upload-report.json').json
+        self.assertEqual(report['destinations']['sondehub']['counts'],{'disabled':1})
+
+    def test_weather_historical_completed_jobs_are_unchanged(self):
+        self.legacy_weather_job('expired');self.f.create_schema()
+        self.assertEqual(self.jobs()[0]['status'],'expired')
+
+    def test_endpoint_diagnostics_contact_only_amateur(self):
         class Reply:
-            status_code=202;text='unknown software'
-            def json(self):return {'errors':[{'error_message':'This software is unknown to us!'}]}
+            status_code=200;text='ok'
+            def json(self):return {'message':'ok'}
         with patch.object(self.f.requests,'put',return_value=Reply()) as send:
             response=self.post('/api/upload-test')
-        self.assertEqual(response.status_code,200);self.assertEqual(send.call_count,3)
-        result=response.json
-        self.assertEqual(result['sondehub']['validation'],'rejected_or_unconfirmed')
-        self.assertEqual(result['sondehub_dfm']['validation'],'rejected_or_unconfirmed')
-        payloads=[json.loads(gzip.decompress(call.kwargs['data']))[0] for call in send.call_args_list]
-        self.assertEqual({x['type'] for x in payloads if 'type' in x},{'DFM','RS41'})
-        self.assertTrue(all(x.get('dev') for x in payloads))
+        self.assertEqual(response.status_code,200);send.assert_called_once()
+        self.assertEqual(set(response.json),{'amateur'})
+        self.assertEqual(set(self.f.ENDPOINTS),{'amateur'})
+        self.assertTrue(send.call_args.args[0].endswith('/amateur/telemetry'))
+        payload=json.loads(gzip.decompress(send.call_args.kwargs['data']))[0]
+        self.assertIn('dev',payload)
+        self.assertNotIn('type',payload)
 
     def test_history_notes_csv_gpx_and_position_time(self):
         self.packet(raw='[0.2] N0TEST>APZPSM:!3800.00N/07800.00WO/A=003281')

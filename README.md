@@ -2,7 +2,7 @@
 
 A Raspberry Pi field receiver for amateur balloon and weather-sonde recovery: sequential SDR scanning, a simple phone dashboard, and durable local coordinates when recovery has to wait.
 
-**Application: 0.3.18 · Signed application updates**
+**Application: 0.3.19 · Signed application updates**
 
 Fresh installs of 0.3.16 automatically verify the signed release and enroll its public key during setup. Existing enrolled devices update through the GUI. Older unenrolled devices still need one-time [signed-update enrollment](SIGNED-UPDATES.md). Source commits alone do not deploy updates; publisher signature and signed-channel publication are required.
 
@@ -60,9 +60,9 @@ This installer refuses an existing `/opt/pisonde-mobile` installation. It is not
 | --- | --- |
 | APRS | APRS-IS; downstream services decide what they ingest/display |
 | Horus | SondeHub Amateur |
-| DFM / RS41 | SondeHub weather endpoint; **PiSonde-Mobile approval remains pending** |
+| DFM / RS41 | Local decoding, coordinates, history and CSV/GPX export only; no direct weather uploads |
 
-Uploads start **disabled**, with placeholder callsign `N0CALL`. Enter your own callsign and explicitly enable uploads. SondeHub uses 30-second gzip batches; exact queued weather JSON is available for validation export. The custom software identity is retained. Development validation does not create live balloon tracks. APRS-IS socket writes are not end-to-end delivery acknowledgments.
+Uploads start **disabled**, with placeholder callsign `N0CALL`. Enter your own callsign and explicitly enable uploads. Horus uses 30-second gzip batches to SondeHub Amateur. DFM/RS41 never enter the upload queue; old pending weather jobs are disabled on upgrade without deleting history. Historical weather JSONL exports contain only payloads saved by older releases. The custom software identity is retained. Development validation does not create live balloon tracks. APRS-IS socket writes are not end-to-end delivery acknowledgments.
 
 Receiver position is unpublished. Vehicle GPS/chase-location support has been discussed but is **not implemented in this release**.
 
@@ -70,7 +70,7 @@ Receiver position is unpublished. Vehicle GPS/chase-location support has been di
 
 The weather receiver invokes the established `rs41mod`, `dfm09mod` and `dft_detect` programs from [radiosonde_auto_rx](https://github.com/projecthorus/radiosonde_auto_rx). APRS uses [Dire Wolf](https://github.com/wb2osz/direwolf); Horus uses [horusdemodlib](https://github.com/projecthorus/horusdemodlib).
 
-**The custom Python application, dashboard, integration, setup tooling and tests were developed with substantial ChatGPT/Codex assistance and iterative hardware testing.** The established radio decoders were reused, not generated as replacements. Custom telemetry handling still requires independent validation; automated tests do not constitute SondeHub approval.
+**The custom Python application, dashboard, integration, setup tooling and tests were developed with substantial ChatGPT/Codex assistance and iterative hardware testing.** The established radio decoders were reused, not generated as replacements. Weather telemetry stays local. Automated tests do not establish RF performance or downstream map ingestion.
 
 The installer pins the two decoder repository revisions. OS/Python dependencies are resolved at installation time; this is a source installer, not a reproducible SD-card image.
 
@@ -80,7 +80,7 @@ Read [CHANGELOG.md](CHANGELOG.md) for the version history and [GitHub Releases](
 
 ## Background updates
 
-Version 0.3.18 retains three independent automatic-install options: a selectable two-hour maintenance window in 24-hour local time, installation at the next reboot after a missed window, and immediate installation when a new version is detected. Checks run about every six hours. Defaults preserve scheduled 0300–0500 installation; the other options start off. Manual checks and installation remain available. Updates use a curated stable manifest pinned to immutable source commits, preserve local configuration/history and attempt rollback on failure.
+Version 0.3.19 retains three independent automatic-install options: a selectable two-hour maintenance window in 24-hour local time, installation at the next reboot after a missed window, and immediate installation when a new version is detected. Checks run about every six hours. Defaults preserve scheduled 0300–0500 installation; the other options start off. Manual checks and installation remain available. Updates use a curated stable manifest pinned to immutable source commits, preserve local configuration/history and attempt rollback on failure.
 
 For an existing device, follow the [one-time updater setup](UPDATES.md). New installations configure update support during initial hardware setup. Application updates do not install OS/dependency changes or database migrations.
 
@@ -125,4 +125,4 @@ Actual application screens with **synthetic demo data**, not live telemetry or p
 | --- | --- |
 | ![History](docs/screenshots/history.png) | ![Uploads](docs/screenshots/uploads.png) |
 
-See the [screenshot gallery](docs/screenshots/README.md) for the field guide and weather-validation page.
+See the [screenshot gallery](docs/screenshots/README.md) for the Device controls page and offline field guide.

@@ -26,21 +26,19 @@ class GuiTests(unittest.TestCase):
   s=self.status();self.assertEqual({x['callsign'] for x in s['ui_targets']},{'RECOVERY','ACTIVE'})
  def test_same_callsign_different_protocols_remain_separate(self):
   self.add(call='TEST',protocol='RS41');self.add(call='TEST',protocol='APRS');self.assertEqual(len(self.status()['ui_targets']),2)
- def test_specific_approval_error_is_named_and_survives_expiration_in_session(self):
-  data=self.f.upload_status();data['destinations']['sondehub']['last']={'status':'pending','last_error':'This software is unknown to us!'}
-  with patch.object(self.f,'upload_status',return_value=data):self.assertTrue(self.status()['ui_weather_approval'])
-  data['destinations']['sondehub']['last']={'status':'expired','last_error':'Too old'}
-  with patch.object(self.f,'upload_status',return_value=data):self.assertTrue(self.status()['ui_weather_approval'])
-  data['destinations']['sondehub']['last']={'status':'accepted','last_error':''}
-  with patch.object(self.f,'upload_status',return_value=data):self.assertFalse(self.status()['ui_weather_approval'])
- def test_generic_upload_failure_is_not_called_approval(self):
-  data=self.f.upload_status();data['destinations']['sondehub']['last']={'status':'pending','last_error':'Network unreachable'}
-  with patch.object(self.f,'upload_status',return_value=data):self.assertFalse(self.status()['ui_weather_approval'])
+ def test_weather_local_only_status_and_guidance(self):
+  self.assertTrue(self.status()['ui_weather_local_only'])
+  self.assertNotIn('ui_weather_approval',self.status())
+  page=self.client.get('/sondehub-approval').text
+  self.assertIn('Weather reception: local only',page)
+  self.assertNotIn('Contact <a href="mailto:',page)
+  self.assertIn('local only',self.client.get('/').text)
+  self.assertIn('local display and history only',self.client.get('/uploads').text)
  def test_help_exports_and_controls_remain_available(self):
   for path in ['/','/help','/sondehub-approval','/wifi','/history','/uploads','/weather-validation.jsonl?type=RS41','/upload-report.json']:
    self.assertEqual(self.client.get(path).status_code,200,path)
   self.assertEqual(self.client.post('/api/control',json={'profile':'STOP'}).status_code,403)
-  page=self.client.get('/').text;self.assertIn('v0.3.18',page);self.assertIn('id="upload-status"',page);self.assertNotIn('Auto: resume searching',page)
+  page=self.client.get('/').text;self.assertIn('v0.3.19',page);self.assertIn('id="upload-status"',page);self.assertNotIn('Auto: resume searching',page)
  def test_status_reads_do_not_touch_stored_history(self):
   self.add();before=self.m.DB.read_bytes();self.status();self.status()
   with self.m.database() as db:self.assertEqual(db.execute('SELECT COUNT(*) FROM receptions').fetchone()[0],1)
@@ -52,7 +50,7 @@ class GuiTests(unittest.TestCase):
   self.assertIn('href="/updates"',self.client.get('/').text)
   self.assertEqual(self.client.post('/api/updates',json={'operation':'install'}).status_code,403)
   with self.client.session_transaction() as session:token=session['token']
-  with patch.object(self.f,'broker',return_value={'automatic':False,'installed_version':'0.3.18'}) as broker:
+  with patch.object(self.f,'broker',return_value={'automatic':False,'installed_version':'0.3.19'}) as broker:
    response=self.client.post('/api/updates',json={'operation':'set_auto','enabled':False},headers={'X-CSRF-Token':token})
    self.assertEqual(response.status_code,200);broker.assert_called_once_with('update',operation='set_auto',enabled=False)
 

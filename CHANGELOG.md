@@ -2,6 +2,15 @@
 
 Application versions, stable-channel deployments and GitHub Releases are related but distinct. An enrolled device installs only the immutable source snapshot authenticated by `updates/signed-stable.json` (legacy devices use `updates/stable.json`); publishing a tag alone does not deploy code. GitHub Releases are available from the repository's Releases page.
 
+## 0.3.19 — pending publisher signature
+
+- Remove direct DFM/RS41 uploads to sondehub.org and weather upload payload generation. Keep weather decoding, local coordinates, raw packets, notes, CSV and GPX.
+- Disable old pending weather jobs at startup and before upload processing, preserving their history and payload archives. Re-enabling uploads cannot resume weather uploads.
+- Restrict HTTP telemetry and development endpoint tests to SondeHub Amateur; retain Horus and APRS-IS paths.
+- Replace weather approval prompts with local-only guidance. Clearly label older JSONL payloads as archival exports.
+- Refresh application screenshots with synthetic data and the colored navigation/buttons, including Device controls.
+- Pass 214 offline checks covering local weather storage/exports, durable queue retirement, APRS/Horus regression and existing update/retention/power behavior.
+
 ## 0.3.18 — 2026-10-27
 
 - Move restart/shutdown controls to their own `/device` page. Add Device controls between Updates and Help in the main navigation and shared page menus.

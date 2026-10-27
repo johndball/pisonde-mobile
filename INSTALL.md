@@ -1,6 +1,6 @@
-# Install PiSonde Mobile 0.3.18 — public packaging revision 1
+# Install PiSonde Mobile 0.3.19 — public packaging revision 1
 
-This is a **fresh-install source package**, not an update for an existing PiSonde installation. The receiver/GUI code is based on 0.3.18. Public packaging adds hardware discovery and removes installation-specific identities. **This fresh-SD installer has passed offline checks but has not yet been run end-to-end on a Raspberry Pi.** Keep your working card intact and use a spare card for the first installation.
+This is a **fresh-install source package**, not an update for an existing PiSonde installation. The receiver/GUI code is based on 0.3.19. Public packaging adds hardware discovery and removes installation-specific identities. **This fresh-SD installer has passed offline checks but has not yet been run end-to-end on a Raspberry Pi.** Keep your working card intact and use a spare card for the first installation.
 
 ## Requirements
 
@@ -22,7 +22,7 @@ On the Pi, using Ethernet or a local console:
 sudo apt-get update
 sudo apt-get install -y git
 cd ~
-git clone --branch v0.3.18 --depth 1 https://github.com/johndball/pisonde-mobile.git
+git clone --branch v0.3.19 --depth 1 https://github.com/johndball/pisonde-mobile.git
 cd pisonde-mobile
 sudo bash install.sh
 ```
@@ -79,11 +79,11 @@ Uploads start **disabled** with the placeholder `N0CALL`. On **Uploads**, enter 
 | --- | --- |
 | APRS | APRS-IS; eligible packets may appear on aprs.fi or SondeHub Amateur through their ingestion paths. A successful socket write is not proof of map ingestion. |
 | Horus | SondeHub Amateur. Reserved test payloads use development-only validation. |
-| DFM / RS41 | SondeHub weather endpoint. **Custom uploader approval is still required**; this package keeps the `PiSonde-Mobile` identity. Local decoding/history works independently. |
+| DFM / RS41 | Local decoding, coordinate display, history and CSV/GPX export only. No weather telemetry is uploaded. |
 
 Outbound TCP 14580 is used for the default APRS-IS server. SondeHub uploads use HTTPS/TCP 443. DNS and a correctly synchronized clock are also needed. No inbound Internet port forwarding is required. SondeHub development validation does not create a live map track.
 
-For weather approval, the dashboard's guide links to the current [SondeHub telemetry validation instructions](https://github.com/projecthorus/sondehub-infra/wiki/Sonde-Telemetry-Validation) and provides JSONL/report exports. Approval is not bundled with the software. Old telemetry is retained locally rather than re-dated and presented as live data.
+Weather uploads are not supported. Existing pending weather jobs are disabled on upgrade; local reception history and saved payload archives remain available, subject to the retention policy. Use established radiosonde reception/upload software separately if weather uploads are required.
 
 ## 6. Check the installation
 

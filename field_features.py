@@ -28,8 +28,7 @@ net_lock=threading.Lock()
 DEFAULT=dict(enabled=False,callsign='N0CALL',aprs_server='noam.aprs2.net',aprs_port=14580,
              aprs_max_age_seconds=120,sondehub_max_age_seconds=180,dev_uploads=True)
 SETTINGS={}
-ENDPOINTS={'amateur':'https://api.v2.sondehub.org/amateur/telemetry',
-           'sondehub':'https://api.v2.sondehub.org/sondes/telemetry'}
+ENDPOINTS={'amateur':'https://api.v2.sondehub.org/amateur/telemetry'}
 network_state=dict(status='Starting',last_success=None,last_error='',last_destination='',
                    delivery_note='APRS socket writes are not end-to-end acknowledgments.')
 # Reserved test IDs never become live SondeHub telemetry.
@@ -99,52 +98,7 @@ def format_sonde(row,settings):
             # Use receipt time only for its DEV validation; keep decoded raw time locally.
             out['datetime']=stamp(received)
         return 'amateur',out,test
-    if mode not in ('DFM','RS41'):raise ValueError('Unsupported telemetry type')
-    if raw.get('encrypted'):raise ValueError('Encrypted payload')
-    if not isinstance(raw.get('id'),str):raise ValueError('Missing sonde ID')
-    when=parse_datetime(raw.get('datetime'),received)
-    if abs((when-received).total_seconds())>180:raise ValueError('Payload/receiver time differs by more than 3 minutes')
-    lat,lon=raw.get('lat'),raw.get('lon');alt=raw.get('alt')
-    if not all(numeric(x) for x in (lat,lon,alt)) or not -90<=lat<=90 or not -180<=lon<=180 or not -500<=alt<=60000:
-        raise ValueError('Invalid payload position')
-    if lat==0 and lon==0:raise ValueError('Zero position')
-    if 'sats' in raw and (not numeric(raw['sats']) or raw['sats']<4):raise ValueError('Insufficient GPS satellites')
-    ident=raw['id']
-    if mode=='RS41':
-        if not re.fullmatch(r'[A-Z][0-9]{7}',ident):raise ValueError('Unconfirmed RS41 serial')
-        out.update(manufacturer='Vaisala',type='RS41',serial=ident)
-        frame=raw.get('frame')
-        if not isinstance(frame,int) or isinstance(frame,bool) or frame<0:raise ValueError('Invalid RS41 frame')
-    else:
-        if not re.fullmatch(r'DFM-\d{5,12}',ident):raise ValueError('Unconfirmed DFM serial')
-        out.update(manufacturer='Graw',type='DFM',serial=ident.split('-',1)[1])
-        frame=int(when.timestamp())
-        if 'dfmcode' in raw:out['dfmcode']=raw['dfmcode']
-        subtype=raw.get('subtype')
-        if isinstance(subtype,str):
-            subtype=subtype.split(':',1)[-1]
-            if subtype in ('DFM06','DFM09','DFM09P','DFM17'):out['subtype']=subtype
-    out.update(frame=frame,datetime=stamp(when),lat=lat,lon=lon,alt=alt,frequency=row['frequency_mhz'])
-    # Keep sonde-provided time and reference fields; never substitute receipt time.
-    out.update(lat=round(lat,6),lon=round(lon,6),alt=round(alt,2))
-    bounds={'temp':(-273.,100.),'humidity':(0.,100.),'pressure':(0.,1200.),
-            'vel_h':(0.,350.),'vel_v':(-150.,150.),'heading':(0.,360.),
-            'sats':(0.,100.),'batt':(0.,100.),'snr':(-100.,100.)}
-    for key,(low,high) in bounds.items():
-        value=raw.get(key)
-        if numeric(value) and low<=value<=high:
-            if key=='temp' and value<=-273.:continue
-            if key=='sats':
-                if not float(value).is_integer():continue
-                out[key]=int(value)
-            else:out[key]=round(value,2)
-    for key in ('ref_position','ref_datetime'):
-        if isinstance(raw.get(key),str):out[key]=raw[key]
-    if mode=='RS41':
-        if raw.get('subtype') in ('RS41-SG','RS41-SGP','RS41-SGM'):out['subtype']=raw['subtype']
-        if isinstance(raw.get('bt'),int) and not isinstance(raw['bt'],bool) and raw['bt']>=0:out['burst_timer']=raw['bt']
-        if isinstance(raw.get('aux'),str) and re.fullmatch(r'(?:[0-9a-fA-F]{2})+',raw['aux']):out['xdata']=raw['aux']
-    return 'sondehub',out,False
+    raise ValueError('Only Horus telemetry supports direct HTTP uploads; weather reception is local-only')
 
 
 def create_schema():
@@ -162,10 +116,17 @@ def create_schema():
           recovery_status TEXT NOT NULL DEFAULT 'Watching',PRIMARY KEY(protocol,callsign));
         CREATE INDEX IF NOT EXISTS receptions_target ON receptions(protocol,callsign,id);
         ''')
+    retire_weather_jobs()
+
+def retire_weather_jobs():
+    with M.database() as db:
+        db.execute("""UPDATE upload_jobs SET status='disabled',completed_utc=?,
+          last_error='Weather uploads removed in 0.3.19; local history retained'
+          WHERE destination='sondehub' AND status='pending'""", (stamp(utc()),))
 
 def add_job(row):
     with settings_lock:s=dict(SETTINGS)
-    if not s['enabled']:return
+    if not s['enabled'] or row['protocol'] not in ('APRS','HORUS'):return
     received=isoparse(row['received_utc']).astimezone(timezone.utc)
     try:
         if row['protocol']=='APRS':
@@ -174,39 +135,6 @@ def add_job(row):
             destination='aprs'
         else:
             destination,payload,test=format_sonde(row,s)
-            if not test:
-                # Require recurring weather serials and reject implausible jumps before upload.
-                if row['protocol'] in ('DFM','RS41'):
-                    with M.database() as db:
-                        candidates=db.execute('''SELECT * FROM receptions
-                           WHERE protocol=? AND callsign=? AND id<? AND latitude IS NOT NULL
-                           ORDER BY id DESC LIMIT 30''', (row['protocol'],row['callsign'],row['id'])).fetchall()
-                    current_key=(payload['frame'],payload['datetime'])
-                    prev=[];seen={current_key}
-                    for candidate in candidates:
-                        try:
-                            _,previous_payload,_=format_sonde(candidate,s)
-                            key=(previous_payload['frame'],previous_payload['datetime'])
-                            if key in seen:continue
-                            seen.add(key);prev.append(candidate)
-                            if len(prev)==2:break
-                        except (ValueError,TypeError,KeyError):continue
-                    if len(prev)<2:raise ValueError('Waiting for three distinct position frames for this sonde')
-                    for point in prev:
-                        dt=abs((received-isoparse(point['received_utc'])).total_seconds())
-                        if dt>120:raise ValueError('Waiting for fresh serial confirmation')
-                        lat,lon=row['latitude'],row['longitude']
-                        distance=111320*math.hypot(lat-point['latitude'],(lon-point['longitude'])*math.cos(math.radians(lat)))
-                        if distance/max(dt,1)>350:raise ValueError('Implausible position jump')
-                        if numeric(point['altitude_m']) and abs(row['altitude_m']-point['altitude_m'])/max(dt,1)>150:
-                            raise ValueError('Implausible altitude jump')
-            if row['protocol'] in ('DFM','RS41'):
-                with M.database() as db:
-                    duplicate=db.execute('''SELECT 1 FROM upload_jobs j JOIN receptions r ON r.id=j.reception_id
-                         WHERE j.destination='sondehub' AND r.protocol=? AND r.callsign=?
-                         AND json_extract(j.payload,'$.frame')=? AND json_extract(j.payload,'$.datetime')=? LIMIT 1''',
-                         (row['protocol'],row['callsign'],payload['frame'],payload['datetime'])).fetchone()
-                if duplicate:return
             payload=json.dumps(payload,separators=(',',':'),allow_nan=False)
         with M.database() as db:
             db.execute('''INSERT OR IGNORE INTO upload_jobs
@@ -267,6 +195,7 @@ def validate_sondehub_response(response,payload):
 
 
 def upload_cycle(http=requests):
+    retire_weather_jobs()
     s=settings_snapshot()
     if not s['enabled']:
         network_state['status']='Paused';return
@@ -280,7 +209,7 @@ def upload_cycle(http=requests):
             OR (destination!='aprs' AND created_utc<?) OR created_utc>?)""",
           (stamp(now),stamp(now-timedelta(seconds=s['aprs_max_age_seconds'])),
            stamp(now-timedelta(seconds=s['sondehub_max_age_seconds'])),stamp(now+timedelta(seconds=30))))
-        rows=db.execute("SELECT * FROM upload_jobs WHERE status='pending' AND next_attempt<=? ORDER BY id LIMIT 100",(time.time(),)).fetchall()
+        rows=db.execute("SELECT * FROM upload_jobs WHERE status='pending' AND destination IN ('aprs','amateur') AND next_attempt<=? ORDER BY id LIMIT 100",(time.time(),)).fetchall()
     if not rows:
         network_state['status']='Waiting for eligible packets';return
     groups=collections.defaultdict(list)
@@ -296,7 +225,7 @@ def upload_cycle(http=requests):
             if destination=='aprs':
                 send_aprs([x['payload'] for x in items],s)
                 result='sent'
-            else:
+            elif destination=='amateur':
                 payload=[json.loads(x['payload']) for x in items]
                 body=gzip.compress(json.dumps(payload,allow_nan=False).encode())
                 response=http.put(ENDPOINTS[destination],data=body,headers={
@@ -305,6 +234,8 @@ def upload_cycle(http=requests):
                 if response.status_code not in (200,201,202):
                     raise RuntimeError('HTTP '+str(response.status_code)+': '+response.text[:300])
                 result=validate_sondehub_response(response,payload)
+            else:
+                raise RuntimeError('Unsupported upload destination')
             complete(ids,result)
             network_state.update(status=('Development test validated: ' if result=='test_passed' else 'Sent to ')+destination,last_success=stamp(utc()),
                                  last_error='',last_destination=destination)
@@ -685,7 +616,7 @@ def gpx():
 def uploads_page():
     return page('''<h2>Uploads</h2><p>Receiver position is never published. Live packets use your station callsign for attribution.</p>
 <label>Station callsign<input id="call" value="{{settings.callsign}}"></label><label><input style="width:auto" id="enabled" type="checkbox" {% if settings.enabled %}checked{% endif %}> Enable uploads</label><button id="save">Save</button>
-<p>APRS → APRS-IS; balloon position reports with the balloon symbol and altitude can be imported by SondeHub Amateur. Horus → SondeHub Amateur. DFM/RS41 → SondeHub.</p><p id="state"></p><pre id="destinations" style="white-space:pre-wrap"></pre><p>Weather validation downloads: <a href="/weather-validation.jsonl?type=DFM">DFM JSONL</a> · <a href="/weather-validation.jsonl?type=RS41">RS41 JSONL</a> · <a href="/upload-report.json">Upload report</a></p><p>Weather publishing requires SondeHub approval of PiSonde-Mobile for each sonde type. Collect actual flight data for review; an empty JSONL file means no eligible samples have been queued yet. Exporting never retransmits old packets.</p><button id="test">Test SondeHub endpoints (development mode)</button><p>Development tests are validated without creating live balloon tracks. APRS needs an RF reception to test its iGate path.</p><pre id="results" style="white-space:pre-wrap"></pre>
+<p>APRS → APRS-IS; balloon position reports with the balloon symbol and altitude can be imported by SondeHub Amateur. Horus → SondeHub Amateur. DFM/RS41 → local display and history only; direct weather uploads are not supported.</p><p id="state"></p><pre id="destinations" style="white-space:pre-wrap"></pre><p>Historical weather payload archive: <a href="/weather-validation.jsonl?type=DFM">DFM JSONL</a> · <a href="/weather-validation.jsonl?type=RS41">RS41 JSONL</a> · <a href="/upload-report.json">Upload report</a></p><p>These JSONL links export only payloads saved by older releases. No new weather upload payloads are generated. Weather positions remain available locally and in CSV/GPX exports. Pending weather uploads from older releases are disabled, with history retained.</p><button id="test">Test SondeHub Amateur (development mode)</button><p>Development tests do not create live balloon tracks. APRS needs an RF reception to test its iGate path.</p><pre id="results" style="white-space:pre-wrap"></pre>
 <fieldset><legend>Storage and retention</legend>
 <label>History retention<select id="retention-mode" disabled><option value="forever">Keep forever (default)</option><option value="days">Keep for a number of days</option><option value="low_space">Clean up when storage is low</option></select></label>
 <label id="retention-days-label">Retention period<select id="retention-days" disabled><option value="30">30 days</option><option value="60">60 days</option><option value="90">90 days</option><option value="180">180 days</option><option value="365">365 days</option></select></label>
@@ -703,7 +634,7 @@ retentionElement('mode').onchange=retentionVisibility;retentionVisibility();
 function showRetention(s){if(!s)return;const p=s.policy;if(!retentionLoaded){retentionElement('mode').value=p.mode;retentionElement('days').value=p.days;retentionElement('threshold').value=p.threshold;retentionElement('protect').checked=p.protect_latest;retentionVisibility();retentionLoaded=true;for(const id of ['mode','days','threshold','protect','save'])retentionElement(id).disabled=false;}retentionElement('status').textContent=s.free_percent+'% free · '+(s.message||'No cleanup run yet')+(s.last_run?' · Last check '+s.last_run:'')+' · Last removed '+(s.last_deleted||0)+(s.last_error?' · '+s.last_error:'')+(s.settings_error?' · '+s.settings_error:'');}
 retentionElement('save').onclick=async()=>{const policy={mode:retentionElement('mode').value,days:Number(retentionElement('days').value),threshold:Number(retentionElement('threshold').value),protect_latest:retentionElement('protect').checked};const confirmed=policy.mode==='forever'?false:confirm('Enable automatic deletion of eligible history and linked upload/validation payloads? Export important data first. Backups may retain older records.');if(policy.mode!=='forever'&&!confirmed)return;const button=retentionElement('save');button.disabled=true;retentionElement('feedback').textContent='Saving…';const abort=new AbortController(),timer=setTimeout(()=>abort.abort(),10000);try{const response=await fetch('/api/retention',{method:'POST',signal:abort.signal,headers:{'Content-Type':'application/json','X-CSRF-Token':token},body:JSON.stringify({policy,confirmed})});const value=await response.json();if(!response.ok)throw Error(value.error||'Retention save failed');retentionLoaded=false;showRetention(value);retentionElement('feedback').textContent='Retention policy saved. Background cleanup will evaluate it shortly.';}catch(e){retentionElement('feedback').textContent='Save failed: '+e.message;}finally{clearTimeout(timer);button.disabled=false;}};
 
-async function status(){const s=await(await fetch('/api/status',{cache:'no-store'})).json();showRetention(s.retention);document.getElementById('destinations').textContent=Object.entries(s.upload.destinations).map(([name,d])=>name+': '+JSON.stringify(d.counts)+(d.last&&d.last.last_error?' · '+d.last.last_error:'')).join('\\n')+'\\nWeather validation samples: '+JSON.stringify(s.upload.weather_validation_samples);document.getElementById('state').textContent=s.upload.status+' · '+JSON.stringify(s.upload.counts)+(s.upload.last_success?' · Last sent '+s.upload.last_success+' to '+s.upload.last_destination:'')+(s.upload.last_error?' · '+s.upload.last_error:'');}status();setInterval(status,5000);document.getElementById('save').onclick=async()=>{const r=await fetch('/api/uploads',{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':token},body:JSON.stringify({enabled:document.getElementById('enabled').checked,callsign:document.getElementById('call').value})});document.getElementById('state').textContent=r.ok?'Saved':'Save failed';};document.getElementById('test').onclick=async()=>{const b=document.getElementById('test');b.disabled=true;document.getElementById('results').textContent='Testing…';try{const r=await fetch('/api/upload-test',{method:'POST',headers:{'X-CSRF-Token':token}});document.getElementById('results').textContent=JSON.stringify(await r.json(),null,2);}catch(e){document.getElementById('results').textContent=e.message;}finally{b.disabled=false;}};</script>''',settings=settings_snapshot())
+async function status(){const s=await(await fetch('/api/status',{cache:'no-store'})).json();showRetention(s.retention);document.getElementById('destinations').textContent=Object.entries(s.upload.destinations).map(([name,d])=>name+': '+JSON.stringify(d.counts)+(d.last&&d.last.last_error?' · '+d.last.last_error:'')).join('\\n')+'\\nArchived weather payloads: '+JSON.stringify(s.upload.weather_validation_samples);document.getElementById('state').textContent=s.upload.status+' · '+JSON.stringify(s.upload.counts)+(s.upload.last_success?' · Last sent '+s.upload.last_success+' to '+s.upload.last_destination:'')+(s.upload.last_error?' · '+s.upload.last_error:'');}status();setInterval(status,5000);document.getElementById('save').onclick=async()=>{const r=await fetch('/api/uploads',{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':token},body:JSON.stringify({enabled:document.getElementById('enabled').checked,callsign:document.getElementById('call').value})});document.getElementById('state').textContent=r.ok?'Saved':'Save failed';};document.getElementById('test').onclick=async()=>{const b=document.getElementById('test');b.disabled=true;document.getElementById('results').textContent='Testing…';try{const r=await fetch('/api/upload-test',{method:'POST',headers:{'X-CSRF-Token':token}});document.getElementById('results').textContent=JSON.stringify(await r.json(),null,2);}catch(e){document.getElementById('results').textContent=e.message;}finally{b.disabled=false;}};</script>''',settings=settings_snapshot())
 
 
 def upload_settings():
@@ -726,13 +657,11 @@ def development_upload_test():
     base=metadata(s,now)
     base.update(datetime=stamp(now),lat=10.,lon=20.,alt=100.,frame=int(now.timestamp()),
                 dev='PiSonde Mobile endpoint test; do not publish')
-    cases={'amateur':dict(base,payload_callsign='PISONDE-TEST'),
-           'sondehub':dict(base,manufacturer='Vaisala',type='RS41',serial='T0000000'),
-           'sondehub_dfm':dict(base,manufacturer='Graw',type='DFM',subtype='DFM17',serial='123456789')}
+    cases={'amateur':dict(base,payload_callsign='PISONDE-TEST')}
     results={}
     for destination,payload in cases.items():
         try:
-            r=requests.put(ENDPOINTS['sondehub' if destination=='sondehub_dfm' else destination],data=gzip.compress(json.dumps([payload]).encode()),
+            r=requests.put(ENDPOINTS[destination],data=gzip.compress(json.dumps([payload]).encode()),
                 headers={'Content-Type':'application/json','Content-Encoding':'gzip','User-Agent':'PiSonde-Mobile/'+M.VERSION},timeout=(8,10))
             try:
                 validation=validate_sondehub_response(r,[payload]);problem=''
