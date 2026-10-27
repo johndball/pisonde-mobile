@@ -40,7 +40,7 @@ class GuiTests(unittest.TestCase):
   for path in ['/','/help','/sondehub-approval','/wifi','/history','/uploads','/weather-validation.jsonl?type=RS41','/upload-report.json']:
    self.assertEqual(self.client.get(path).status_code,200,path)
   self.assertEqual(self.client.post('/api/control',json={'profile':'STOP'}).status_code,403)
-  page=self.client.get('/').text;self.assertIn('v0.3.11',page);self.assertIn('id="upload-status"',page);self.assertNotIn('Auto: resume searching',page)
+  page=self.client.get('/').text;self.assertIn('v0.3.12',page);self.assertIn('id="upload-status"',page);self.assertNotIn('Auto: resume searching',page)
  def test_status_reads_do_not_touch_stored_history(self):
   self.add();before=self.m.DB.read_bytes();self.status();self.status()
   with self.m.database() as db:self.assertEqual(db.execute('SELECT COUNT(*) FROM receptions').fetchone()[0],1)
@@ -52,7 +52,7 @@ class GuiTests(unittest.TestCase):
   self.assertIn('href="/updates"',self.client.get('/').text)
   self.assertEqual(self.client.post('/api/updates',json={'operation':'install'}).status_code,403)
   with self.client.session_transaction() as session:token=session['token']
-  with patch.object(self.f,'broker',return_value={'automatic':False,'installed_version':'0.3.11'}) as broker:
+  with patch.object(self.f,'broker',return_value={'automatic':False,'installed_version':'0.3.12'}) as broker:
    response=self.client.post('/api/updates',json={'operation':'set_auto','enabled':False},headers={'X-CSRF-Token':token})
    self.assertEqual(response.status_code,200);broker.assert_called_once_with('update',operation='set_auto',enabled=False)
 

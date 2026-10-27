@@ -124,3 +124,14 @@ class UpdateTests(unittest.TestCase):
         path=u.DATA.parent/'uploads.json';settings=json.loads(path.read_text())
         self.assertTrue(settings['enabled']);self.assertEqual(settings['callsign'],'N0TEST-3');self.assertEqual(path.stat().st_mode&0o777,0o600)
         path.write_text('preserve-existing');u.legacy_upload_settings();self.assertEqual(path.read_text(),'preserve-existing')
+
+    def test_bootstrap_uses_supported_ownership_api_and_completes_install(self):
+        from types import SimpleNamespace
+        folder=self.folder()
+        with patch.object(u.os,'geteuid',return_value=0),patch.object(u.os,'chown') as chown,patch.object(u.pwd,'getpwnam',return_value=SimpleNamespace(pw_uid=999,pw_gid=999)),patch.object(u,'catalog',return_value=self.value),patch.object(u,'legacy_hardware'),patch.object(u,'legacy_upload_settings'),patch.object(u,'stage',return_value=folder),patch.object(u,'install_support') as support,patch.object(u,'services'),patch.object(u,'health'),patch.object(u,'command') as command:
+            u.bootstrap()
+        chown.assert_any_call(u.APP,0,0)
+        support.assert_called_once_with(start_timer=False)
+        self.assertEqual(u.app_version(),'0.3.11')
+        self.assertFalse((u.STATE/'pending.json').exists())
+        command.assert_called_with(['systemctl','start','pisonde-update.timer'])

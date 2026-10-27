@@ -56,14 +56,14 @@ def validate(catalog):
     return catalog
 
 def download(url,limit):
-    request=urllib.request.Request(url,headers={'User-Agent':'PiSonde-Mobile-Updater/1'})
+    request=urllib.request.Request(url,headers={'User-Agent':'PiSonde-Mobile-Updater/1','Cache-Control':'no-cache'})
     with urllib.request.urlopen(request,timeout=25) as response:
         if not response.geturl().startswith(RAW):raise RuntimeError('Unexpected download redirect')
         data=response.read(limit+1)
     if len(data)>limit:raise RuntimeError('Update download exceeds size limit')
     return data
 
-def catalog():return validate(json.loads(download(CHANNEL,65536)))
+def catalog():return validate(json.loads(download(CHANNEL+'?check='+str(time.time_ns()),65536)))
 def stage(value):
     validate(value)
     root=STATE/'staged';root.mkdir(parents=True,exist_ok=True)
@@ -308,7 +308,7 @@ def bootstrap():
     if version(value['version'])<version(app_version()):raise RuntimeError('Refusing to downgrade this installation')
     legacy_hardware()
     legacy_upload_settings()
-    APP.chown(0,0);APP.chmod(0o755)
+    os.chown(APP,0,0);APP.chmod(0o755)
     STATE.mkdir(parents=True,exist_ok=True)
     folder=stage(value)
     atomic(APP/'update_manager.py',(folder/'update_manager.py').read_bytes())
