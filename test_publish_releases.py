@@ -33,3 +33,13 @@ class ReleaseTests(unittest.TestCase):
     def test_future_version_waits_for_channel_publication(self):
         with patch.object(p,'request') as request:p.publish(self.entry,dict(version='0.3.12',commit='b'*40))
         request.assert_not_called()
+
+    def test_signed_release_waits_until_signature_is_published(self):
+        with patch.object(p,'request') as request:p.publish(dict(tag='v0.3.15',commit='signed-stable'),dict(version='0.3.14',commit='b'*40))
+        request.assert_not_called()
+    def test_signed_release_uses_signed_source_commit(self):
+        calls=[]
+        def request(method,path,body=None):calls.append((method,path,body));return {'sha':'a'*40} if path.startswith('/git/commits') else None
+        (self.root/'release-notes/v0.3.15.md').write_text('Signed release')
+        with patch.object(p,'request',side_effect=request):p.publish(dict(tag='v0.3.15',commit='signed-stable'),dict(schema=2,version='0.3.15',commit='a'*40))
+        self.assertEqual(next(c[2]['sha'] for c in calls if c[:2]==('POST','/git/refs')),'a'*40)

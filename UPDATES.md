@@ -1,18 +1,12 @@
-> **Signed-update work is on this preparation branch only.** Existing devices remain on 0.3.14 until enrollment. See [SIGNED-UPDATES.md](SIGNED-UPDATES.md).
-
 # Automatic application updates
 
-PiSonde Mobile 0.3.14 adds an Updates page and a root-owned systemd worker. No GitHub token is needed for this public repository.
+PiSonde Mobile 0.3.15 uses an Updates page and a root-owned systemd worker. No GitHub token is needed for this public repository.
 
-## Existing hardware: one-time setup
+## Existing hardware: one-time signed enrollment
 
-Keep the Pi on stable power with Internet access. Installation briefly stops reception; it does not reboot the Pi. From SSH:
+Keep the Pi on stable power with Internet access. Installation briefly stops reception; it does not reboot the Pi. First follow [SIGNED-UPDATES.md](SIGNED-UPDATES.md) to verify the publisher fingerprint and enrollment installer independently.
 
-```sh
-curl --fail --location --max-time 60 https://raw.githubusercontent.com/johndball/pisonde-mobile/main/bootstrap-updates.sh -o /tmp/pisonde-updates.sh && sudo bash /tmp/pisonde-updates.sh
-```
-
-This fetches the stable manifest from the GitHub contents API over HTTPS, verifies the updater's SHA-256, then downloads the listed application files from the manifest's immutable source commit and checks each hash. The repository owner's stable-channel publishing permission is the trust boundary; hashes detect corrupt or mismatched content, not a compromised publisher. No private configuration is uploaded.
+The enrolled updater reads only `updates/signed-stable.json`, requires an Ed25519 signature from the locally trusted public key, and checks repository/channel, expiry, monotonic metadata sequence and payload identity. It then verifies all application file hashes against the signed immutable source commit. There is no unsigned fallback. Existing 0.3.14 devices stay on the legacy channel until enrollment succeeds.
 
 For the original installation, setup extracts existing adapter identities from local Python constants into a local hardware configuration. It never rewrites saved NetworkManager profiles or passwords. Existing scanner settings, upload identity, reception database and logs remain in place. If it cannot safely identify the installed hardware configuration, setup stops for review.
 
@@ -37,7 +31,7 @@ Installed/available versions, last check, last successful installation and error
 
 ## Recovery and limits
 
-Only the explicit application-file manifest is applied. The updater does not run the fresh-install script, modify OS packages, rebuild decoders, install new Python dependencies, perform database schema migrations or change receiver service definitions (apart from the existing update-recovery dependency). Releases needing those changes require a separate reviewed installer. Ordinary `main` commits do not deploy: a publisher must move `updates/stable.json` to a tested immutable source commit with compatibility `app-only-v1` and matching hashes.
+Only the explicit application-file manifest is applied. The updater does not run the fresh-install script, modify OS packages, rebuild decoders, install new Python dependencies, perform database schema migrations or change receiver service definitions (apart from the existing update-recovery dependency). Releases needing those changes require a separate reviewed installer. Ordinary `main` commits do not deploy: a publisher must sign and publish `updates/signed-stable.json` to a tested immutable source commit with compatibility `app-only-v1` and matching hashes.
 
 Version 0.3.14 also migrates the updater-owned timer once through the root Wi-Fi broker when the new application starts. It does not change Wi-Fi roles or saved profiles. This migration allows existing web-updated devices to use every selectable window without an SSH setup command.
 
@@ -57,7 +51,7 @@ systemctl list-timers pisonde-update.timer --no-pager
 sudo journalctl -u pisonde-update-run.service -u pisonde-update-install.service -n 40 --no-pager
 ```
 
-Confirm **0.3.14** on the dashboard, the Updates controls match your chosen policy, and sample flow/reception resumes. Select **Check now** and confirm **Up to date**. Reboot during a convenient maintenance period and confirm the AP and receiver return. Hardware installation is not verified until these device-side checks succeed.
+Confirm **0.3.15** on the dashboard, the Updates controls match your chosen policy, and sample flow/reception resumes. Select **Check now** and confirm **Up to date**. Reboot during a convenient maintenance period and confirm the AP and receiver return. Hardware installation is not verified until these device-side checks succeed.
 
 All web-changing actions require the existing CSRF token and go through a narrow root broker with fixed operation names. The local dashboard uses HTTP: keep it on a trusted network and do not expose it directly to the Internet.
 

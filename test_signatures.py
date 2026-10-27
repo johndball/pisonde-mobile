@@ -127,3 +127,39 @@ class SignatureTests(unittest.TestCase):
         self.assertEqual(u.read(u.STATE/'signature-state.json')['sequence'],2)
     def test_signer_allowlist_matches_device_allowlist(self):
         self.assertEqual(s.FILES,u.FILES)
+
+    def enroller(self):
+        spec=importlib.util.spec_from_file_location('test_enroller',Path(__file__).parent/'enroll-signed-updates.py')
+        module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
+        module.FINGERPRINT=s.key_id(self.private.public_key());module.PUBLIC=u.TRUST.read_bytes()
+        return module
+    def test_enrollment_frontend_independently_verifies_signed_manifest(self):
+        e=self.enroller();self.assertEqual(e.verify(self.value,u.TRUST),self.value)
+        with self.assertRaises(RuntimeError):e.verify(dict(self.value,commit='b'*40),u.TRUST)
+    def test_enrollment_does_not_fetch_executable_after_bad_signature(self):
+        e=self.enroller();bad=dict(self.value,commit='b'*40)
+        entry=dict(encoding='base64',path='updates/signed-stable.json',content=base64.b64encode(json.dumps(bad).encode()).decode())
+        with patch.object(e,'fetch',return_value=json.dumps(entry).encode()) as fetch:
+            with self.assertRaises(RuntimeError):e.prepare(Path(self.temp.name))
+        self.assertEqual(fetch.call_count,1)
+    def test_enrollment_fetches_only_signature_bound_updater(self):
+        e=self.enroller()
+        entry=dict(encoding='base64',path='updates/signed-stable.json',content=base64.b64encode(json.dumps(self.value).encode()).decode())
+        def download(url,limit):return json.dumps(entry).encode() if url.startswith(e.API) else self.source['update_manager.py']
+        with patch.object(e,'fetch',side_effect=download) as fetch:value,public,path=e.prepare(Path(self.temp.name))
+        self.assertEqual(value,self.value);self.assertEqual(path.read_bytes(),self.source['update_manager.py'])
+        self.assertIn(self.value['commit'],fetch.call_args.args[0])
+    def test_enrollment_uses_pinned_fingerprint(self):
+        with patch.object(u,'command') as command,patch.object(u,'bootstrap') as bootstrap:
+            with self.assertRaisesRegex(RuntimeError,'fingerprint'):u.enroll(self.value,u.TRUST)
+        bootstrap.assert_not_called();command.assert_not_called()
+    def test_failed_enrollment_leaves_automatic_timer_stopped(self):
+        fingerprint=s.key_id(self.private.public_key())
+        with patch.object(u,'ENROLL_FINGERPRINT',fingerprint),patch.object(u,'command') as command,patch.object(u,'bootstrap',side_effect=RuntimeError('health failed')):
+            with self.assertRaises(RuntimeError):u.enroll(self.value,u.TRUST)
+        self.assertEqual(command.call_args.args[0],['systemctl','stop','pisonde-update.timer'])
+        self.assertEqual(command.call_count,2)
+    def test_successful_enrollment_installs_public_key_only(self):
+        original=u.TRUST;target=Path(self.temp.name)/'enrolled'/'public.pem'
+        with patch.object(u,'TRUST',target),patch.object(u,'ENROLL_FINGERPRINT',s.key_id(self.private.public_key())),patch.object(u,'command'),patch.object(u,'bootstrap') as bootstrap:u.enroll(self.value,original)
+        self.assertEqual(target.read_bytes(),original.read_bytes());bootstrap.assert_called_once_with(self.value)

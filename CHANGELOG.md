@@ -1,14 +1,14 @@
 # Changelog
 
-Application versions, stable-channel deployments and GitHub Releases are related but distinct. A device installs only the immutable source snapshot named in `updates/stable.json`; publishing a tag alone does not deploy code. GitHub Releases are available from the repository's Releases page.
+Application versions, stable-channel deployments and GitHub Releases are related but distinct. An enrolled device installs only the immutable source snapshot authenticated by `updates/signed-stable.json` (legacy devices use `updates/stable.json`); publishing a tag alone does not deploy code. GitHub Releases are available from the repository's Releases page.
 
-## 0.3.15 — preparation, not released
+## 0.3.15 — 2026-10-27, signed publication pending
 
-- Draft a separate signed channel while preserving the 0.3.14 legacy channel and all historical releases.
+- Add a separate signed channel while preserving the 0.3.14 legacy channel and all historical releases.
 - Add local encrypted Ed25519 key generation and manifest signing tools; no production private keys are created or held by CI.
 - Verify signed manifests against a root-owned, independently enrolled public key using OpenSSL. Check repository/channel, validity, metadata sequence and signed payload identity before staging/applying.
 - Reject unsigned, tampered, wrong-key, expired and replayed metadata. Preserve existing per-file integrity, backup and rollback checks.
-- Add interoperability and fail-closed tests. Public-key enrollment, first publisher signature and final release/fresh-install integration remain pending.
+- Add 179 regression checks, including real Python/OpenSSL interoperability, tampering/replay rejection and enrollment ordering. Publication awaits the publisher signature; hardware enrollment and RF validation remain separate.
 
 ## 0.3.14 — 2026-10-27
 

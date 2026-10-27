@@ -2,9 +2,9 @@
 
 A Raspberry Pi field receiver for amateur balloon and weather-sonde recovery: sequential SDR scanning, a simple phone dashboard, and durable local coordinates when recovery has to wait.
 
-**Development candidate: 0.3.15 · Signed-update preparation**
+**Application: 0.3.15 · Signed application updates**
 
-Stable devices remain on **0.3.14**. This branch is awaiting the publisher public key, first release signature and reviewed enrollment installer. Start with [signed-update preparation](SIGNED-UPDATES.md); do not install this branch yet.
+Version 0.3.15 requires one-time [signed-update enrollment](SIGNED-UPDATES.md). Older devices remain on the 0.3.14 legacy channel until enrolled. Publishing/installing 0.3.15 is gated on the first valid publisher signature; source commits alone do not deploy it.
 
 > The receiver has been exercised on the original field Pi. The generalized fresh-install workflow has passed offline tests but still needs an end-to-end test on a fresh Raspberry Pi OS card. Keep a known-working card intact.
 
@@ -79,13 +79,13 @@ Read [CHANGELOG.md](CHANGELOG.md) for the version history and [GitHub Releases](
 
 ## Background updates
 
-Version 0.3.14 includes three independent automatic-install options: a selectable two-hour maintenance window in 24-hour local time, installation at the next reboot after a missed window, and immediate installation when a new version is detected. Checks run about every six hours. Defaults preserve scheduled 0300–0500 installation; the other options start off. Manual checks and installation remain available. Updates use a curated stable manifest pinned to immutable source commits, preserve local configuration/history and attempt rollback on failure.
+Version 0.3.15 retains three independent automatic-install options: a selectable two-hour maintenance window in 24-hour local time, installation at the next reboot after a missed window, and immediate installation when a new version is detected. Checks run about every six hours. Defaults preserve scheduled 0300–0500 installation; the other options start off. Manual checks and installation remain available. Updates use a curated stable manifest pinned to immutable source commits, preserve local configuration/history and attempt rollback on failure.
 
 For an existing device, follow the [one-time updater setup](UPDATES.md). New installations configure update support during initial hardware setup. Application updates do not install OS/dependency changes or database migrations.
 
 ## Tests and field checks
 
-The public baseline passed **150 offline regression tests**. With dependencies installed, run from the repository (the signing tests also require `cryptography` in your development environment):
+The public baseline passed **179 offline regression tests**. With dependencies installed, run from the repository (the signing tests also require `cryptography` in your development environment):
 
 ```sh
 /opt/pisonde-mobile/venv/bin/python run_tests.py

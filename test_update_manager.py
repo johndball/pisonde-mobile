@@ -132,6 +132,7 @@ class UpdateTests(unittest.TestCase):
         with patch.object(u,'UPDATER_VERSION','0.3.11'),patch.object(u.os,'geteuid',return_value=0),patch.object(u.os,'chown') as chown,patch.object(u.pwd,'getpwnam',return_value=SimpleNamespace(pw_uid=999,pw_gid=999)),patch.object(u,'catalog',return_value=self.value),patch.object(u,'legacy_hardware'),patch.object(u,'legacy_upload_settings'),patch.object(u,'stage',return_value=folder),patch.object(u,'install_support') as support,patch.object(u,'services'),patch.object(u,'health'),patch.object(u,'command') as command:
             u.bootstrap()
         chown.assert_any_call(u.APP,0,0)
+        self.assertEqual((next(u.BACKUPS.iterdir())/'update_manager.py').read_bytes(),b'# original\n')
         support.assert_called_once_with(start_timer=False)
         self.assertEqual(u.app_version(),'0.3.11')
         self.assertFalse((u.STATE/'pending.json').exists())

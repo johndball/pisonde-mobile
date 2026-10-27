@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Publish reviewed version notes as tags/Releases using the Actions job token."""
-import json,os,re,sys,urllib.error,urllib.request
+import importlib.util,json,os,re,sys,urllib.error,urllib.request
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]
 
@@ -20,7 +20,9 @@ def publish(entry,stable):
     tag=entry['tag']
     if not re.fullmatch(r'v\d+\.\d+\.\d+',tag):raise RuntimeError('Invalid release tag')
     target=entry['commit']
-    if target=='stable':
+    if target in ('stable','signed-stable'):
+        if target=='signed-stable' and stable.get('schema')!=2:
+            print('Waiting for signed-channel publication:',tag);return
         if tag!='v'+stable['version']:
             print('Waiting for stable-channel publication:',tag);return
         target=stable['commit']
@@ -42,5 +44,10 @@ def publish(entry,stable):
 def main():
     entries=json.loads((ROOT/'releases/versions.json').read_text())
     stable=json.loads((ROOT/'updates/stable.json').read_text())
+    signed=ROOT/'updates/signed-stable.json'
+    if signed.exists():
+        spec=importlib.util.spec_from_file_location('verify_published_manifest',ROOT/'enroll-signed-updates.py')
+        verifier=importlib.util.module_from_spec(spec);spec.loader.exec_module(verifier)
+        stable=verifier.verify(verifier.strict_json(signed.read_bytes()),ROOT/'updates/signing-public.pem')
     for entry in entries:publish(entry,stable)
 if __name__=='__main__':main()

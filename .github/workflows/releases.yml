@@ -6,6 +6,8 @@ on:
       - 'releases/**'
       - 'release-notes/**'
       - 'updates/stable.json'
+      - 'updates/signed-stable.json'
+      - 'updates/signing-public.pem'
       - 'CHANGELOG.md'
       - 'tools/publish_releases.py'
       - '.github/workflows/releases.yml'

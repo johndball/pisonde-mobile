@@ -1,8 +1,6 @@
-> **Preparation branch: do not install yet.** Signed-update enrollment is being prepared; see [SIGNED-UPDATES.md](SIGNED-UPDATES.md). Stable installation instructions below describe 0.3.14.
+# Install PiSonde Mobile 0.3.15 — public packaging revision 1
 
-# Install PiSonde Mobile 0.3.14 — public packaging revision 1
-
-This is a **fresh-install source package**, not an update for an existing PiSonde installation. The receiver/GUI code is based on 0.3.14. Public packaging adds hardware discovery and removes installation-specific identities. **This fresh-SD installer has passed offline checks but has not yet been run end-to-end on a Raspberry Pi.** Keep your working card intact and use a spare card for the first installation.
+This is a **fresh-install source package**, not an update for an existing PiSonde installation. The receiver/GUI code is based on 0.3.15. Public packaging adds hardware discovery and removes installation-specific identities. **This fresh-SD installer has passed offline checks but has not yet been run end-to-end on a Raspberry Pi.** Keep your working card intact and use a spare card for the first installation.
 
 ## Requirements
 
@@ -127,3 +125,7 @@ Dependencies: the two decoder repositories are commit-pinned in `install.sh`; Py
 ## Application updates
 
 Fresh setup installs the background update timer and Updates page. See [UPDATES.md](UPDATES.md) for automatic-install settings, maintenance timing and recovery limits. Existing devices use that guide’s one-time setup instead of rerunning this fresh installer.
+
+## Signed update enrollment
+
+After hardware/AP configuration, follow [SIGNED-UPDATES.md](SIGNED-UPDATES.md) to enroll the publisher public key using the independently verified installer. Automatic signed updates will fail closed until this step succeeds. The first signed manifest must be published before enrollment.

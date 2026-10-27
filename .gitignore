@@ -40,3 +40,6 @@ horusdemodlib/
 radiosonde_auto_rx/
 installed-python-versions.txt
 
+
+# Public release verification key (never a private signing key)
+!updates/signing-public.pem

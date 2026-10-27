@@ -3,5 +3,6 @@
   {"tag":"v0.3.11","commit":"98989257a869d13d33272928985282d7ed22d54a","prerelease":true},
   {"tag":"v0.3.12","commit":"3744b29e1b3dc7bf771bdc17eb67824d045144d8"},
   {"tag":"v0.3.13","commit":"7da97d429799a53bd9b548b58a8411366282ba14"},
-  {"tag":"v0.3.14","commit":"stable"}
+  {"tag":"v0.3.14","commit":"36c1fc5b3e6926022e33bf93008e586315de5f68"},
+  {"tag":"v0.3.15","commit":"signed-stable"}
 ]

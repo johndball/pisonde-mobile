@@ -15,6 +15,7 @@ CHANNEL=API+'contents/updates/signed-stable.json?ref=main'
 UPDATER_VERSION='0.3.15'
 FILES={'mobile.py','field_features.py','field_ui.py','wifi_control.py','sdr_health.py','hardware.py','storage_maintenance.py','verify_recovery.py','update_manager.py','update_ui.py'}
 TRUST=Path('/etc/pisonde-mobile/update-signing-public.pem')
+ENROLL_FINGERPRINT='34e43261378f0235107cc0d1e3eb8d2bed7d44c44d995323d7646203235dbfd0'
 DOMAIN=b'PiSonde-Mobile signed-stable manifest v1\n'
 UNITS=('pisonde-wifi-control.service','pisonde-mobile.service')
 DEFAULT={'scheduled':True,'reboot_if_missed':False,'immediate':False,'window_start':3,'window_end':5}
@@ -478,17 +479,35 @@ def bootstrap(selected=None):
     os.chown(APP,0,0);APP.chmod(0o755)
     STATE.mkdir(parents=True,exist_ok=True)
     folder=stage(value)
-    atomic(APP/'update_manager.py',(folder/'update_manager.py').read_bytes())
+    # Existing updater code must be backed up intact for a failed enrollment.
+    if not (APP/'update_manager.py').exists():atomic(APP/'update_manager.py',(folder/'update_manager.py').read_bytes())
     install_support(start_timer=False)
     with locked():
         recover_running()
-        # Supply recovery executable before creating a pending transaction.
-        # The old receiver does not import this new module.
-        atomic(APP/'update_manager.py',(folder/'update_manager.py').read_bytes())
         apply(value,folder)
     command(['systemctl','start','pisonde-update.timer'])
     print('PASS: PiSonde Mobile '+value['version']+' installed. Automatic installation: '+str(status()['automatic'])+'; window '+window_label(settings())+'.')
     print('Dashboard: http://192.168.73.1/updates')
+
+def enroll(value,public_path):
+    if os.geteuid()!=0:raise RuntimeError('Public-key enrollment requires root')
+    raw=Path(public_path).read_bytes()
+    if len(raw)>4096 or not raw.startswith(b'-----BEGIN PUBLIC KEY-----'):raise RuntimeError('Only a public key may be enrolled')
+    result=subprocess.run(['/usr/bin/openssl','pkey','-pubin','-in',str(public_path),'-outform','DER'],capture_output=True,timeout=10)
+    if result.returncode or hashlib.sha256(result.stdout).hexdigest()!=ENROLL_FINGERPRINT:raise RuntimeError('Enrollment key differs from the independently verified publisher fingerprint')
+    TRUST.parent.mkdir(parents=True,exist_ok=True)
+    info=TRUST.parent.lstat()
+    if info.st_uid!=0 or info.st_mode&0o022 or stat.S_ISLNK(info.st_mode):raise RuntimeError('Unsafe public-key directory')
+    if TRUST.exists() or TRUST.is_symlink():
+        if trusted_key()[1]!=ENROLL_FINGERPRINT:raise RuntimeError('Refusing to replace an already enrolled key')
+    else:atomic(TRUST,raw)
+    # A failed transition must not silently resume an unsigned automatic updater.
+    command(['systemctl','stop','pisonde-update.timer'])
+    try:bootstrap(value)
+    except BaseException:
+        command(['systemctl','stop','pisonde-update.timer'])
+        raise
+    print('PASS: signed updates enrolled; unsigned fallback is disabled.')
 
 def main():
     if os.geteuid()!=0:raise RuntimeError('Run update worker as root')

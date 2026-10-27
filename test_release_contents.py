@@ -33,7 +33,11 @@ ALLOWED={
     'test_signatures.py',
     'tools/sign_release.py',
     'SIGNED-UPDATES.md',
+    'enroll-signed-updates.py',
+    'updates/signing-public.pem',
+    'release-notes/v0.3.15.md',
     'updates/stable.json',
+    'updates/candidates/0.3.15.json',
 
     '.gitattributes',
     '.gitignore',
@@ -85,4 +89,4 @@ class ReleaseContentsTests(unittest.TestCase):
             relative=path.relative_to(ROOT)
             if any(part in excluded for part in relative.parts):continue
             if path.is_file():actual.add(relative.as_posix())
-        self.assertEqual(actual-{'updates/stable.json'},ALLOWED-{'updates/stable.json'},'Review unexpected files before creating a software release')
+        self.assertEqual(actual-{'updates/stable.json','updates/candidates/0.3.15.json'},ALLOWED-{'updates/stable.json','updates/candidates/0.3.15.json'},'Review unexpected files before creating a software release')
