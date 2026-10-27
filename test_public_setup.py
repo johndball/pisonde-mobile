@@ -8,6 +8,7 @@ class PublicSetupTests(unittest.TestCase):
     def setUp(self):
         self.temp=tempfile.TemporaryDirectory();self.addCleanup(self.temp.cleanup)
         self.root=Path(self.temp.name)
+        self.update_patch=patch('update_manager.install_support');self.update_patch.start();self.addCleanup(self.update_patch.stop)
         self.data=dict(onboard_mac='02:00:00:00:00:01',client_mac='02:00:00:00:00:02',ap_uuid='11111111-2222-4333-8444-555555555555',sdr_serial='DEMO_SDR')
     def load(self):
         path=self.root/'hardware.json';path.write_text(json.dumps(self.data))

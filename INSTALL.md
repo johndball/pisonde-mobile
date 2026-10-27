@@ -1,6 +1,6 @@
-# Install PiSonde Mobile 0.3.10 — public packaging revision 1
+# Install PiSonde Mobile 0.3.11 — public packaging revision 1
 
-This is a **fresh-install source package**, not an update for an existing PiSonde installation. The receiver/GUI code is based on 0.3.10. Public packaging adds hardware discovery and removes installation-specific identities. **This fresh-SD installer has passed offline checks but has not yet been run end-to-end on a Raspberry Pi.** Keep your working card intact and use a spare card for the first installation.
+This is a **fresh-install source package**, not an update for an existing PiSonde installation. The receiver/GUI code is based on 0.3.11. Public packaging adds hardware discovery and removes installation-specific identities. **This fresh-SD installer has passed offline checks but has not yet been run end-to-end on a Raspberry Pi.** Keep your working card intact and use a spare card for the first installation.
 
 ## Requirements
 
@@ -121,3 +121,7 @@ Local history lives under `/var/lib/pisonde-mobile`. A daily checked SQLite back
 Hardware identities are created locally in `/etc/pisonde-mobile/hardware.json`. Wi-Fi credentials remain in NetworkManager's local profiles. Runtime files, saved networks, upload settings, logs, databases and backups can contain private information. **Do not redistribute your installed `/opt`, `/etc`, `/var/lib` or backup directories as a public release.** Share the clean source ZIP instead.
 
 Dependencies: the two decoder repositories are commit-pinned in `install.sh`; Python/OS packages are resolved at installation time. The installed Python version list is recorded in `/opt/pisonde-mobile/installed-python-versions.txt`. This is a source installer, not a fully reproducible SD-card image.
+
+## Application updates
+
+Fresh setup installs the background update timer and Updates page. See [UPDATES.md](UPDATES.md) for automatic-install settings, maintenance timing and recovery limits. Existing devices use that guide’s one-time setup instead of rerunning this fresh installer.

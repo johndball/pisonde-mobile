@@ -105,6 +105,9 @@ def ensure():
 
 def handle(value):
     action=value.get('action')
+    if action=='update':
+        from update_manager import broker_action
+        return broker_action(value)
     if action=='sdr_reset':
         if set(value)!={'action'}:raise RuntimeError('SDR reset accepts no device parameters')
         from sdr_health import broker_reset

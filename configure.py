@@ -77,6 +77,8 @@ def activate():
     for ident in state['active']:
         try:nm('connection','up',ident,'ifname',state['client_interface'])
         except Exception:print('Previous upstream unavailable; add a hotspot from the local Wi-Fi page.')
+    from update_manager import install_support
+    install_support()
     run(['systemctl','enable','--now','pisonde-wifi-control.service','pisonde-mobile.service','pisonde-history-backup.timer'])
     print('Configured: onboard AP at http://192.168.73.1; USB Wi-Fi upstream. Uploads start disabled.')
 

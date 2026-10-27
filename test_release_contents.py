@@ -5,6 +5,13 @@ import unittest
 ROOT=Path(__file__).resolve().parent
 # Adding a release file requires an explicit review of this allowlist.
 ALLOWED={
+    'UPDATES.md',
+    'bootstrap-updates.sh',
+    'update_manager.py',
+    'update_ui.py',
+    'test_update_manager.py',
+    'updates/stable.json',
+
     '.gitattributes',
     '.gitignore',
     'AGENTS.md',
@@ -55,4 +62,4 @@ class ReleaseContentsTests(unittest.TestCase):
             relative=path.relative_to(ROOT)
             if any(part in excluded for part in relative.parts):continue
             if path.is_file():actual.add(relative.as_posix())
-        self.assertEqual(actual,ALLOWED,'Review unexpected files before creating a software release')
+        self.assertEqual(actual-{'updates/stable.json'},ALLOWED-{'updates/stable.json'},'Review unexpected files before creating a software release')

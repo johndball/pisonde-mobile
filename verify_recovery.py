@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Controlled PiSonde Mobile 0.3.10 recovery and field-service verification.
+"""Controlled PiSonde Mobile 0.3.11 recovery and field-service verification.
 Use --field-only for nondisruptive field checks.
 Run the full test with sudo on the installed host while manually locked to APRS. No RF transmission
 or internet access is required. Pauses only unit-owned rtl_fm processes using
@@ -189,10 +189,10 @@ def main():
         try:fcntl.flock(guard,fcntl.LOCK_EX|fcntl.LOCK_NB)
         except BlockingIOError:raise CheckFailed('Another recovery verification is running')
         before=state()
-        if before.get('version')!='0.3.10':raise CheckFailed('Install PiSonde Mobile 0.3.10 before verification')
+        if before.get('version')!='0.3.11':raise CheckFailed('Install PiSonde Mobile 0.3.11 before verification')
         if not field_only and (before.get('config',{}).get('profile')!='MANUAL'
             or before.get('config',{}).get('manual_mode')!='APRS' or before.get('mode')!='APRS'):
-            raise CheckFailed('Select APRS and Lock to Frequency before running this 0.3.10 test')
+            raise CheckFailed('Select APRS and Lock to Frequency before running this 0.3.11 test')
         # Enforce pre-existing reset limits before inducing a fault.
         history=Path('/run/pisonde-sdr-reset-history.json')
         if not field_only and history.exists():
