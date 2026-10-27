@@ -2,7 +2,7 @@
 
 Application versions, stable-channel deployments and GitHub Releases are related but distinct. An enrolled device installs only the immutable source snapshot authenticated by `updates/signed-stable.json` (legacy devices use `updates/stable.json`); publishing a tag alone does not deploy code. GitHub Releases are available from the repository's Releases page.
 
-## 0.3.17 — 2026-10-27, signed publication pending
+## 0.3.17 — 2026-10-27
 
 - Add Uploads retention controls: keep forever (default), 30/60/90/180/365 days, or oldest-first cleanup below 5/10/15/20% free space (10% default).
 - Require confirmation before enabling deletion; optionally protect each target's latest position and the latest reception of noted/recovery-marked targets (enabled by default). Always retain the highest reception ID; low-space cleanup also protects the newest five minutes.
