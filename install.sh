@@ -13,7 +13,7 @@ SOURCE="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 WORK="$(mktemp -d /tmp/pisonde-fresh.XXXXXXXX)"
 trap 'rm -rf "$WORK"' EXIT
 apt-get update
-apt-get install -y openssl ca-certificates
+apt-get install -y python3 openssl ca-certificates
 # Verify the publisher signature and application bytes before installing them.
 python3 "$SOURCE/fresh_install.py" preflight "$SOURCE" "$WORK/release.json"
 apt-get install -y python3-venv python3-dev git build-essential pkg-config libffi-dev libusb-1.0-0-dev librtlsdr-dev rtl-sdr usbutils sox direwolf network-manager ethtool iw libfftw3-dev
