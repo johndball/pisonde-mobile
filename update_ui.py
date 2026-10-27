@@ -28,7 +28,7 @@ function render(s){
  for(const id of optionNames)document.getElementById(id).disabled=saving;
  windowSelect.disabled=saving;save.disabled=saving||!dirty;
  document.getElementById('summary').textContent='Installed: '+s.installed_version+' · Available: '+(s.available_version||'not checked')+' · '+(s.phase||'Ready')+(s.running_version&&s.running_version!==s.installed_version?' · Running: '+s.running_version:'');
- document.getElementById('details').textContent='Last check: '+(s.last_check||'never')+'\nLast successful install: '+(s.last_success||'none')+(s.available_commit?'\nAvailable source: '+s.available_commit.slice(0,12):'')+(s.last_error?'\n'+s.last_error:'');
+ document.getElementById('details').textContent='Update signatures: required · '+(s.signing_enrolled?'key enrolled':'public-key enrollment required')+(s.signing_key_id?'\nSigning key: '+s.signing_key_id:'')+'\nLast check: '+(s.last_check||'never')+'\nLast successful install: '+(s.last_success||'none')+(s.available_commit?'\nAvailable source: '+s.available_commit.slice(0,12):'')+(s.last_error?'\n'+s.last_error:'');
  if(pending){
   const matching=s.operation_id===pending.id,elapsed=Date.now()-pending.start;
   if(matching&&s.completed_at){result.textContent=(s.phase||'Completed')+(s.last_error?': '+s.last_error:'');pending=null;}

@@ -2,7 +2,9 @@
 
 A Raspberry Pi field receiver for amateur balloon and weather-sonde recovery: sequential SDR scanning, a simple phone dashboard, and durable local coordinates when recovery has to wait.
 
-**Application: 0.3.14 · Stable-channel application updates**
+**Development candidate: 0.3.15 · Signed-update preparation**
+
+Stable devices remain on **0.3.14**. This branch is awaiting the publisher public key, first release signature and reviewed enrollment installer. Start with [signed-update preparation](SIGNED-UPDATES.md); do not install this branch yet.
 
 > The receiver has been exercised on the original field Pi. The generalized fresh-install workflow has passed offline tests but still needs an end-to-end test on a fresh Raspberry Pi OS card. Keep a known-working card intact.
 
@@ -83,7 +85,7 @@ For an existing device, follow the [one-time updater setup](UPDATES.md). New ins
 
 ## Tests and field checks
 
-The public baseline passed **150 offline regression tests**. With dependencies installed, run from the repository:
+The public baseline passed **150 offline regression tests**. With dependencies installed, run from the repository (the signing tests also require `cryptography` in your development environment):
 
 ```sh
 /opt/pisonde-mobile/venv/bin/python run_tests.py

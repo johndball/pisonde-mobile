@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Root-owned, app-only stable-channel updater. Never changes radio configuration."""
-import ast,base64,contextlib,fcntl,hashlib,json,logging,os,pwd,re,shutil,sqlite3,subprocess,sys,tempfile,time,urllib.request,uuid
+import ast,base64,contextlib,fcntl,hashlib,json,logging,os,pwd,re,stat,shutil,sqlite3,subprocess,sys,tempfile,time,urllib.request,uuid
 from datetime import datetime,timezone,timedelta
 from pathlib import Path
 
@@ -11,9 +11,11 @@ DATA=Path('/var/lib/pisonde-mobile/receptions.sqlite3')
 HARDWARE=Path('/etc/pisonde-mobile/hardware.json')
 RAW='https://raw.githubusercontent.com/johndball/pisonde-mobile/'
 API='https://api.github.com/repos/johndball/pisonde-mobile/'
-CHANNEL=API+'contents/updates/stable.json?ref=main'
-UPDATER_VERSION='0.3.14'
+CHANNEL=API+'contents/updates/signed-stable.json?ref=main'
+UPDATER_VERSION='0.3.15'
 FILES={'mobile.py','field_features.py','field_ui.py','wifi_control.py','sdr_health.py','hardware.py','storage_maintenance.py','verify_recovery.py','update_manager.py','update_ui.py'}
+TRUST=Path('/etc/pisonde-mobile/update-signing-public.pem')
+DOMAIN=b'PiSonde-Mobile signed-stable manifest v1\n'
 UNITS=('pisonde-wifi-control.service','pisonde-mobile.service')
 DEFAULT={'scheduled':True,'reboot_if_missed':False,'immediate':False,'window_start':3,'window_end':5}
 WINDOWS=tuple((start,(start+2)%24) for start in range(1,24,2))
@@ -87,12 +89,69 @@ def app_version(path=None):
             value=ast.literal_eval(node.value);version(value);return value
     raise RuntimeError('Application version missing')
 def validate(catalog):
-    if not isinstance(catalog,dict) or catalog.get('schema')!=1 or catalog.get('compatibility')!='app-only-v1':raise RuntimeError('Unsupported update channel')
+    if not isinstance(catalog,dict) or catalog.get('schema')!=2 or catalog.get('compatibility')!='app-only-v1':raise RuntimeError('Unsupported update channel')
     version(catalog.get('version'))
     if not re.fullmatch(r'[0-9a-f]{40}',str(catalog.get('commit',''))):raise RuntimeError('Invalid source commit')
     hashes=catalog.get('files')
     if not isinstance(hashes,dict) or set(hashes)!=FILES or any(not re.fullmatch(r'[0-9a-f]{64}',str(h)) for h in hashes.values()):raise RuntimeError('Invalid update file manifest')
     return catalog
+
+def canonical(value):
+    body={k:v for k,v in value.items() if k!='signature'}
+    return DOMAIN+json.dumps(body,sort_keys=True,separators=(',',':'),ensure_ascii=True,allow_nan=False).encode('ascii')
+
+def strict_json(data):
+    def pairs(items):
+        result={}
+        for key,value in items:
+            if key in result:raise RuntimeError('Duplicate manifest field')
+            result[key]=value
+        return result
+    return json.loads(data,object_pairs_hook=pairs,parse_constant=lambda _: (_ for _ in ()).throw(RuntimeError('Invalid manifest number')))
+
+def trusted_key():
+    if not TRUST.exists():raise RuntimeError('Signed updates require one-time public-key enrollment')
+    for path in (TRUST,TRUST.parent):
+        info=path.lstat()
+        if info.st_uid!=0 or info.st_mode&0o022 or stat.S_ISLNK(info.st_mode):raise RuntimeError('Update trust key must be root-owned and protected from writes')
+    if not stat.S_ISREG(TRUST.stat().st_mode) or TRUST.stat().st_size>4096:raise RuntimeError('Invalid public-key file')
+    result=subprocess.run(['/usr/bin/openssl','pkey','-pubin','-in',str(TRUST),'-outform','DER'],capture_output=True,timeout=10)
+    der=result.stdout
+    if result.returncode or len(der)!=44 or not der.startswith(bytes.fromhex('302a300506032b6570032100')):
+        raise RuntimeError('A trusted Ed25519 public key is required')
+    return der,hashlib.sha256(der).hexdigest()
+
+def authenticate(value,record=False):
+    validate(value)
+    if set(value)!={'schema','compatibility','version','commit','files','security','signature'}:raise RuntimeError('Unexpected signed manifest fields')
+    security=value['security'];signature=value['signature']
+    if not isinstance(security,dict) or set(security)!={'repository','channel','sequence','issued_at','expires_at'} or security['repository']!='johndball/pisonde-mobile' or security['channel']!='signed-stable':
+        raise RuntimeError('Manifest is for a different repository or channel')
+    if type(security['sequence']) is not int or not 1<=security['sequence']<=2**53-1:raise RuntimeError('Invalid manifest sequence')
+    if not isinstance(signature,dict) or set(signature)!={'algorithm','key_id','value'} or signature['algorithm']!='ed25519':raise RuntimeError('Unsupported manifest signature')
+    try:
+        issued=datetime.strptime(security['issued_at'],'%Y-%m-%dT%H:%M:%SZ').replace(tzinfo=timezone.utc)
+        expires=datetime.strptime(security['expires_at'],'%Y-%m-%dT%H:%M:%SZ').replace(tzinfo=timezone.utc)
+        raw_signature=base64.b64decode(signature['value'],validate=True)
+    except (ValueError,TypeError,KeyError):raise RuntimeError('Malformed signed manifest') from None
+    clock=datetime.now(timezone.utc)
+    if issued>clock+timedelta(minutes=5):raise RuntimeError('Manifest is from the future; check the Pi clock')
+    if expires<=clock:raise RuntimeError('Signed update manifest expired; a freshly signed manifest is required')
+    if not timedelta(0)<expires-issued<=timedelta(days=366):raise RuntimeError('Invalid signed manifest validity period')
+    der,key_id=trusted_key()
+    if signature['key_id']!=key_id or len(raw_signature)!=64:raise RuntimeError('Manifest signing key does not match the enrolled key')
+    with tempfile.TemporaryDirectory(prefix='pisonde-verify-') as temp:
+        root=Path(temp);(root/'key.der').write_bytes(der);(root/'manifest').write_bytes(canonical(value));(root/'signature').write_bytes(raw_signature)
+        result=subprocess.run(['/usr/bin/openssl','pkeyutl','-verify','-pubin','-keyform','DER','-inkey',str(root/'key.der'),'-rawin','-in',str(root/'manifest'),'-sigfile',str(root/'signature')],capture_output=True,timeout=10)
+    if result.returncode:raise RuntimeError('Update signature verification failed')
+    digest=hashlib.sha256(canonical(value)).hexdigest()
+    previous=read(STATE/'signature-state.json',{})
+    sequence=security['sequence']
+    if previous and (sequence<previous['sequence'] or sequence==previous['sequence'] and digest!=previous['digest']):
+        raise RuntimeError('Signed manifest replay or sequence conflict rejected')
+    if record:
+        put(STATE/'signature-state.json',dict(sequence=sequence,digest=digest,key_id=key_id,verified_at=now()))
+    return value
 
 def download(url,limit):
     request=urllib.request.Request(url,headers={'User-Agent':'PiSonde-Mobile-Updater/1','Cache-Control':'no-cache'})
@@ -104,16 +163,14 @@ def download(url,limit):
     return data
 
 def catalog():
-    entry=json.loads(download(CHANNEL+'&check='+str(time.time_ns()),131072))
-    if entry.get('encoding')!='base64' or entry.get('path')!='updates/stable.json':raise RuntimeError('Invalid channel API response')
-    payload=base64.b64decode(entry['content'])
+    entry=strict_json(download(CHANNEL+'&check='+str(time.time_ns()),131072))
+    if entry.get('encoding')!='base64' or entry.get('path')!='updates/signed-stable.json':raise RuntimeError('Invalid channel API response')
+    payload=base64.b64decode(''.join(entry['content'].split()),validate=True)
     if len(payload)>65536:raise RuntimeError('Manifest too large')
-    value=validate(json.loads(payload))
-    value['channel_blob_sha']=entry.get('sha','')
-    return value
+    return authenticate(strict_json(payload),record=True)
 
 def stage(value):
-    validate(value)
+    authenticate(value)
     root=STATE/'staged';root.mkdir(parents=True,exist_ok=True)
     target=root/value['commit']
     with tempfile.TemporaryDirectory(prefix='.download-',dir=root) as temp:
@@ -156,6 +213,8 @@ def status():
         age=(datetime.now(timezone.utc)-datetime.fromisoformat(value['queued_at'])).total_seconds()
         if age>90:value.update(phase='Update worker did not start',outcome='timeout',completed_at=now(),last_error='Queued operation exceeded 90 seconds; inspect the update worker log')
     cfg=settings()
+    verified=read(STATE/'signature-state.json',{})
+    value.update(signatures_required=True,signing_enrolled=TRUST.exists(),signing_key_id=verified.get('key_id',''))
     value.update(cfg,automatic=any(cfg[k] for k in ('scheduled','reboot_if_missed','immediate')),window=window_label(cfg),installed_version=app_version(),configured=(STATE/'settings.json').exists())
     return value
 
@@ -189,7 +248,7 @@ def recover():
         update_status(phase='Recovered previous application after interrupted update',last_error='',recovered_at=now())
 
 def apply(value,folder):
-    validate(value)
+    authenticate(value)
     # Check staged bytes again immediately before stopping reception.
     for name,digest in value['files'].items():
         if hashlib.sha256((folder/name).read_bytes()).hexdigest()!=digest:raise RuntimeError('Staged content changed')
@@ -253,7 +312,10 @@ def run(action):
             checked=read(STATE/'status.json',{}).get('last_check')
             fresh=checked and 0<=(datetime.now(timezone.utc)-datetime.fromisoformat(checked)).total_seconds()<6*3600
             if action=='run' and fresh and cached:
-                value=validate(cached)
+                try:value=authenticate(cached)
+                except RuntimeError:
+                    # A re-signed/renewed catalog may supersede an expired or stale cache.
+                    value=catalog();put(STATE/'available.json',value);update_status(last_check=now())
             else:
                 value=catalog();put(STATE/'available.json',value)
                 update_status(last_check=now())
@@ -408,7 +470,7 @@ def legacy_upload_settings():
 def bootstrap(selected=None):
     if os.geteuid()!=0 or not (APP/'mobile.py').is_file():raise RuntimeError('Run on an existing PiSonde Mobile installation with sudo')
     pwd.getpwnam('pisonde-mobile')
-    value=validate(selected) if selected is not None else catalog()
+    value=authenticate(selected,record=True) if selected is not None else catalog()
     if version(value['version'])<version(UPDATER_VERSION):raise RuntimeError('Stable channel is older than this installer; retry after publication completes')
     if version(value['version'])<version(app_version()):raise RuntimeError('Refusing to downgrade this installation')
     legacy_hardware()

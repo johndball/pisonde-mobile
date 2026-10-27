@@ -1,3 +1,5 @@
+> **Signed-update work is on this preparation branch only.** Existing devices remain on 0.3.14 until enrollment. See [SIGNED-UPDATES.md](SIGNED-UPDATES.md).
+
 # Automatic application updates
 
 PiSonde Mobile 0.3.14 adds an Updates page and a root-owned systemd worker. No GitHub token is needed for this public repository.

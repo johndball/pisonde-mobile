@@ -2,6 +2,14 @@
 
 Application versions, stable-channel deployments and GitHub Releases are related but distinct. A device installs only the immutable source snapshot named in `updates/stable.json`; publishing a tag alone does not deploy code. GitHub Releases are available from the repository's Releases page.
 
+## 0.3.15 — preparation, not released
+
+- Draft a separate signed channel while preserving the 0.3.14 legacy channel and all historical releases.
+- Add local encrypted Ed25519 key generation and manifest signing tools; no production private keys are created or held by CI.
+- Verify signed manifests against a root-owned, independently enrolled public key using OpenSSL. Check repository/channel, validity, metadata sequence and signed payload identity before staging/applying.
+- Reject unsigned, tampered, wrong-key, expired and replayed metadata. Preserve existing per-file integrity, backup and rollback checks.
+- Add interoperability and fail-closed tests. Public-key enrollment, first publisher signature and final release/fresh-install integration remain pending.
+
 ## 0.3.14 — 2026-10-27
 
 - Replace the single automatic-install checkbox with three combinable options: a selectable maintenance window, next-boot installation after a missed window, and immediate installation when a version is detected.

@@ -250,7 +250,7 @@ class HealthTests(unittest.TestCase):
         from unittest.mock import mock_open
         spec=importlib.util.spec_from_file_location('field_verifier',Path(__file__).with_name('verify_recovery.py'))
         v=importlib.util.module_from_spec(spec);spec.loader.exec_module(v)
-        baseline={'version':'0.3.14','config':{'profile':'STOP'}}
+        baseline={'version':'0.3.15','config':{'profile':'STOP'}}
         with patch.object(v.sys,'argv',['verify_recovery.py','--field-only']), \
              patch.object(v.os,'geteuid',return_value=0),patch.object(v.socket,'gethostname',return_value='example-pi'), \
              patch.object(v,'open',mock_open(),create=True),patch.object(v.fcntl,'flock'), \

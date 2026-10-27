@@ -7,6 +7,7 @@ import update_manager as u
 
 class UpdateTests(unittest.TestCase):
     def setUp(self):
+        auth=patch.object(u,'authenticate',side_effect=lambda value,record=False:u.validate(value));auth.start();self.addCleanup(auth.stop)
         self.temp=tempfile.TemporaryDirectory();self.addCleanup(self.temp.cleanup);root=Path(self.temp.name)
         for name,path in {'APP':root/'app','STATE':root/'state','BACKUPS':root/'backups','DATA':root/'data.sqlite3','HARDWARE':root/'hardware.json'}.items():
             p=patch.object(u,name,path);p.start();self.addCleanup(p.stop)
@@ -14,7 +15,7 @@ class UpdateTests(unittest.TestCase):
         for name in u.FILES:(u.APP/name).write_text("VERSION='0.3.10'\n" if name=='mobile.py' else '# original\n')
         with sqlite3.connect(u.DATA) as db:db.execute('CREATE TABLE receptions(id INTEGER)');db.execute('INSERT INTO receptions VALUES(42)')
         self.source={name:("VERSION='0.3.11'\n" if name=='mobile.py' else '# updated\n').encode() for name in u.FILES}
-        self.value=dict(schema=1,compatibility='app-only-v1',version='0.3.11',commit='a'*40,files={n:hashlib.sha256(b).hexdigest() for n,b in self.source.items()})
+        self.value=dict(schema=2,compatibility='app-only-v1',version='0.3.11',commit='a'*40,files={n:hashlib.sha256(b).hexdigest() for n,b in self.source.items()})
     def folder(self):
         path=u.STATE/'fixture';path.mkdir()
         for name,data in self.source.items():(path/name).write_bytes(data)
@@ -137,10 +138,10 @@ class UpdateTests(unittest.TestCase):
         command.assert_called_with(['systemctl','start','pisonde-update.timer'])
     def test_catalog_uses_api_content_and_preserves_manifest_identity(self):
         import base64
-        entry=dict(encoding='base64',path='updates/stable.json',sha='b'*40,content=base64.b64encode(json.dumps(self.value).encode()).decode())
+        entry=dict(encoding='base64',path='updates/signed-stable.json',sha='b'*40,content=base64.b64encode(json.dumps(self.value).encode()).decode())
         with patch.object(u,'download',return_value=json.dumps(entry).encode()) as download:value=u.catalog()
-        self.assertEqual(value['commit'],self.value['commit']);self.assertEqual(value['channel_blob_sha'],'b'*40)
-        self.assertTrue(download.call_args.args[0].startswith(u.API+'contents/updates/stable.json?ref=main&check='))
+        self.assertEqual(value['commit'],self.value['commit']);self.assertNotIn('channel_blob_sha',value)
+        self.assertTrue(download.call_args.args[0].startswith(u.API+'contents/updates/signed-stable.json?ref=main&check='))
     def test_queued_check_completes_with_same_operation_id(self):
         u.put(u.STATE/'settings.json',u.DEFAULT)
         with patch.object(u.os,'geteuid',return_value=0),patch.object(u,'command'):

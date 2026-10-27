@@ -30,6 +30,9 @@ ALLOWED={
     'update_manager.py',
     'update_ui.py',
     'test_update_manager.py',
+    'test_signatures.py',
+    'tools/sign_release.py',
+    'SIGNED-UPDATES.md',
     'updates/stable.json',
 
     '.gitattributes',
