@@ -5,6 +5,16 @@ import unittest
 ROOT=Path(__file__).resolve().parent
 # Adding a release file requires an explicit review of this allowlist.
 ALLOWED={
+    'CHANGELOG.md',
+    '.github/workflows/releases.yml',
+    'tools/publish_releases.py',
+    'releases/versions.json',
+    'release-notes/v0.3.10.md',
+    'release-notes/v0.3.11.md',
+    'release-notes/v0.3.12.md',
+    'release-notes/v0.3.13.md',
+    'test_publish_releases.py',
+
     'UPDATES.md',
     'bootstrap-updates.sh',
     'update_manager.py',

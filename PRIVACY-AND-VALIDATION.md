@@ -1,6 +1,6 @@
 # Public-release privacy and validation notes
 
-Package: **0.3.12**, prepared 27 October 2026.
+Package: **0.3.13**, prepared 27 October 2026.
 
 ## Privacy changes
 
@@ -15,7 +15,7 @@ The dashboard still displays the installing Pi's MAC addresses locally. This is 
 
 ## Checks performed
 
-- **125 offline regression tests passed**, covering receiver/scanner behavior, field UI, upload logic, Wi-Fi binding/forgetting, SDR recovery targeting, public hardware validation, AP activation rollback, setup identity generation and disabled-upload defaults.
+- **135 offline regression tests passed**, covering receiver/scanner behavior, field UI, upload logic, Wi-Fi binding/forgetting, SDR recovery targeting, public hardware validation, AP activation rollback, setup identity generation and disabled-upload defaults.
 - Python compilation and Bash syntax checks passed.
 - Fresh package scanned for the original identifiers and common credential/key formats; only intended synthetic adapter/UUID values remain. Archive contents checked for runtime data and private artifacts.
 - Source and documentation checksums are included in SHA256SUMS.

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Root-owned, app-only stable-channel updater. Never changes radio configuration."""
-import ast,contextlib,fcntl,hashlib,json,logging,os,pwd,re,shutil,sqlite3,subprocess,sys,tempfile,time,urllib.request,uuid
+import ast,base64,contextlib,fcntl,hashlib,json,logging,os,pwd,re,shutil,sqlite3,subprocess,sys,tempfile,time,urllib.request,uuid
 from datetime import datetime,timezone
 from pathlib import Path
 
@@ -10,7 +10,9 @@ BACKUPS=Path('/var/backups/pisonde-updater')
 DATA=Path('/var/lib/pisonde-mobile/receptions.sqlite3')
 HARDWARE=Path('/etc/pisonde-mobile/hardware.json')
 RAW='https://raw.githubusercontent.com/johndball/pisonde-mobile/'
-CHANNEL=RAW+'main/updates/stable.json'
+API='https://api.github.com/repos/johndball/pisonde-mobile/'
+CHANNEL=API+'contents/updates/stable.json?ref=main'
+UPDATER_VERSION='0.3.13'
 FILES={'mobile.py','field_features.py','field_ui.py','wifi_control.py','sdr_health.py','hardware.py','storage_maintenance.py','verify_recovery.py','update_manager.py','update_ui.py'}
 UNITS=('pisonde-wifi-control.service','pisonde-mobile.service')
 DEFAULT={'automatic':True,'window_start':3,'window_end':5}
@@ -58,12 +60,21 @@ def validate(catalog):
 def download(url,limit):
     request=urllib.request.Request(url,headers={'User-Agent':'PiSonde-Mobile-Updater/1','Cache-Control':'no-cache'})
     with urllib.request.urlopen(request,timeout=25) as response:
-        if not response.geturl().startswith(RAW):raise RuntimeError('Unexpected download redirect')
+        expected=API if url.startswith(API) else RAW
+        if not response.geturl().startswith(expected):raise RuntimeError('Unexpected download redirect')
         data=response.read(limit+1)
     if len(data)>limit:raise RuntimeError('Update download exceeds size limit')
     return data
 
-def catalog():return validate(json.loads(download(CHANNEL+'?check='+str(time.time_ns()),65536)))
+def catalog():
+    entry=json.loads(download(CHANNEL+'&check='+str(time.time_ns()),131072))
+    if entry.get('encoding')!='base64' or entry.get('path')!='updates/stable.json':raise RuntimeError('Invalid channel API response')
+    payload=base64.b64decode(entry['content'])
+    if len(payload)>65536:raise RuntimeError('Manifest too large')
+    value=validate(json.loads(payload))
+    value['channel_blob_sha']=entry.get('sha','')
+    return value
+
 def stage(value):
     validate(value)
     root=STATE/'staged';root.mkdir(parents=True,exist_ok=True)
@@ -104,6 +115,9 @@ def update_status(**fields):
     value=read(STATE/'status.json',{});value.update(fields);put(STATE/'status.json',value)
 def status():
     value=read(STATE/'status.json',{})
+    if value.get('phase')=='Queued' and value.get('queued_at') and not value.get('started_at'):
+        age=(datetime.now(timezone.utc)-datetime.fromisoformat(value['queued_at'])).total_seconds()
+        if age>90:value.update(phase='Update worker did not start',outcome='timeout',completed_at=now(),last_error='Queued operation exceeded 90 seconds; inspect the update worker log')
     value.update(automatic=settings()['automatic'],window='03:00–05:00 local time',installed_version=app_version(),configured=(STATE/'settings.json').exists())
     return value
 
@@ -162,7 +176,10 @@ def apply(value,folder):
     try:
         services('stop')
         for name in sorted(FILES):atomic(APP/name,(folder/name).read_bytes())
-        services('start');health(value['version'])
+        update_status(phase='Restarting application')
+        services('start')
+        update_status(phase='Verifying application')
+        health(value['version'])
     except BaseException:
         try:services('stop')
         except Exception:pass
@@ -182,22 +199,32 @@ def recover_running():
 
 def run(action):
     if action not in ('run','check','install'):raise RuntimeError('Unsupported update operation')
-    command(['systemctl','start','pisonde-update-recover.service'])
+    try:command(['systemctl','start','pisonde-update-recover.service'])
+    except Exception as exc:
+        current=read(STATE/'status.json',{})
+        if current.get('phase')=='Queued' and current.get('operation')==action:
+            update_status(phase='Update worker failed to start',outcome='failed',completed_at=now(),last_error=str(exc)[:300])
+        raise
     with locked():
-        recover_running()
-        update_status(phase='Checking',last_error='')
+        current=read(STATE/'status.json',{})
+        ident=current.get('operation_id') if current.get('phase')=='Queued' and current.get('operation')==action else uuid.uuid4().hex
+        update_status(operation_id=ident,operation=action,started_at=now(),completed_at=None,outcome=None,phase='Checking',last_error='',last_result='')
         try:
-            value=catalog();current=app_version()
-            update_status(last_check=now(),available_version=value['version'],available_commit=value['commit'])
-            if version(value['version'])<=version(current):
-                update_status(phase='Up to date');return
+            recover_running()
+            value=catalog();installed=app_version()
+            update_status(last_check=now(),available_version=value['version'],available_commit=value['commit'],channel_blob_sha=value.get('channel_blob_sha',''))
+            if version(value['version'])<=version(installed):
+                update_status(phase='Up to date',outcome='up_to_date',completed_at=now());return
+            update_status(phase='Downloading update')
             folder=stage(value)
             cfg=settings();hour=datetime.now().hour
             automatic=action=='run' and cfg['automatic'] and cfg['window_start']<=hour<cfg['window_end']
-            if action=='install' or automatic:apply(value,folder)
-            else:update_status(phase='Update downloaded; ready to install')
+            if action=='install' or automatic:
+                apply(value,folder);update_status(outcome='installed',completed_at=now())
+            else:update_status(phase='Update downloaded; ready to install',outcome='available',completed_at=now())
         except Exception as exc:
-            if read(STATE/'status.json',{}).get('last_result')!='rolled_back':update_status(phase='Update check/install failed',last_error=str(exc)[:300])
+            rolled_back=read(STATE/'status.json',{}).get('last_result')=='rolled_back'
+            update_status(phase='Rolled back' if rolled_back else 'Update check/install failed',outcome='rolled_back' if rolled_back else 'failed',completed_at=now(),last_error=str(exc)[:300])
             raise
 
 def broker_action(value):
@@ -211,9 +238,18 @@ def broker_action(value):
         cfg=settings();cfg['automatic']=value['enabled'];put(STATE/'settings.json',cfg);return status()
     if action not in ('check','install'):raise RuntimeError('Unsupported update control')
     if not (STATE/'settings.json').exists():raise RuntimeError('Run the one-time updater setup first')
+    ident=uuid.uuid4().hex
+    with locked():
+        previous=read(STATE/'status.json',{})
+        if previous.get('phase')=='Queued' and previous.get('queued_at'):
+            age=(datetime.now(timezone.utc)-datetime.fromisoformat(previous['queued_at'])).total_seconds()
+            if age<90:raise RuntimeError('An update operation is already queued')
+        update_status(operation_id=ident,operation=action,queued_at=now(),started_at=None,completed_at=None,outcome=None,phase='Queued',last_error='')
     name='pisonde-update-'+action+'.service'
-    command(['systemctl','start','--no-block',name])
-    return dict(queued=action)
+    try:command(['systemctl','start','--no-block',name])
+    except Exception as exc:
+        update_status(phase='Update could not be queued',outcome='failed',completed_at=now(),last_error=str(exc)[:300]);raise
+    return dict(queued=action,operation_id=ident)
 
 RECOVER_UNIT='''[Unit]
 Description=Recover interrupted PiSonde application update
@@ -301,10 +337,11 @@ def legacy_upload_settings():
         return
     raise RuntimeError('Cannot preserve upload defaults; save upload settings in the current dashboard first')
 
-def bootstrap():
+def bootstrap(selected=None):
     if os.geteuid()!=0 or not (APP/'mobile.py').is_file():raise RuntimeError('Run on an existing PiSonde Mobile installation with sudo')
     pwd.getpwnam('pisonde-mobile')
-    value=catalog()
+    value=validate(selected) if selected is not None else catalog()
+    if version(value['version'])<version(UPDATER_VERSION):raise RuntimeError('Stable channel is older than this installer; retry after publication completes')
     if version(value['version'])<version(app_version()):raise RuntimeError('Refusing to downgrade this installation')
     legacy_hardware()
     legacy_upload_settings()
@@ -320,13 +357,14 @@ def bootstrap():
         atomic(APP/'update_manager.py',(folder/'update_manager.py').read_bytes())
         apply(value,folder)
     command(['systemctl','start','pisonde-update.timer'])
-    print('PASS: stable-channel updater installed. Automatic installation: '+str(settings()['automatic'])+'; window 03:00–05:00 local time.')
+    print('PASS: PiSonde Mobile '+value['version']+' installed. Automatic installation: '+str(settings()['automatic'])+'; window 03:00–05:00 local time.')
     print('Dashboard: http://192.168.73.1/updates')
 
 def main():
     if os.geteuid()!=0:raise RuntimeError('Run update worker as root')
-    action=sys.argv[1] if len(sys.argv)==2 else ''
-    if action=='bootstrap':return bootstrap()
+    action=sys.argv[1] if len(sys.argv) in (2,3) else ''
+    if action=='bootstrap':return bootstrap(read(Path(sys.argv[2])) if len(sys.argv)==3 else None)
+    if len(sys.argv)!=2:raise RuntimeError('Invalid updater arguments')
     if action=='recover':
         with locked():return recover()
     return run(action)

@@ -128,10 +128,43 @@ class UpdateTests(unittest.TestCase):
     def test_bootstrap_uses_supported_ownership_api_and_completes_install(self):
         from types import SimpleNamespace
         folder=self.folder()
-        with patch.object(u.os,'geteuid',return_value=0),patch.object(u.os,'chown') as chown,patch.object(u.pwd,'getpwnam',return_value=SimpleNamespace(pw_uid=999,pw_gid=999)),patch.object(u,'catalog',return_value=self.value),patch.object(u,'legacy_hardware'),patch.object(u,'legacy_upload_settings'),patch.object(u,'stage',return_value=folder),patch.object(u,'install_support') as support,patch.object(u,'services'),patch.object(u,'health'),patch.object(u,'command') as command:
+        with patch.object(u,'UPDATER_VERSION','0.3.11'),patch.object(u.os,'geteuid',return_value=0),patch.object(u.os,'chown') as chown,patch.object(u.pwd,'getpwnam',return_value=SimpleNamespace(pw_uid=999,pw_gid=999)),patch.object(u,'catalog',return_value=self.value),patch.object(u,'legacy_hardware'),patch.object(u,'legacy_upload_settings'),patch.object(u,'stage',return_value=folder),patch.object(u,'install_support') as support,patch.object(u,'services'),patch.object(u,'health'),patch.object(u,'command') as command:
             u.bootstrap()
         chown.assert_any_call(u.APP,0,0)
         support.assert_called_once_with(start_timer=False)
         self.assertEqual(u.app_version(),'0.3.11')
         self.assertFalse((u.STATE/'pending.json').exists())
         command.assert_called_with(['systemctl','start','pisonde-update.timer'])
+    def test_catalog_uses_api_content_and_preserves_manifest_identity(self):
+        import base64
+        entry=dict(encoding='base64',path='updates/stable.json',sha='b'*40,content=base64.b64encode(json.dumps(self.value).encode()).decode())
+        with patch.object(u,'download',return_value=json.dumps(entry).encode()) as download:value=u.catalog()
+        self.assertEqual(value['commit'],self.value['commit']);self.assertEqual(value['channel_blob_sha'],'b'*40)
+        self.assertTrue(download.call_args.args[0].startswith(u.API+'contents/updates/stable.json?ref=main&check='))
+    def test_queued_check_completes_with_same_operation_id(self):
+        u.put(u.STATE/'settings.json',u.DEFAULT)
+        with patch.object(u.os,'geteuid',return_value=0),patch.object(u,'command'):
+            queued=u.broker_action(dict(action='update',operation='check'))
+            with patch.object(u,'catalog',return_value=self.value),patch.object(u,'stage',return_value=self.folder()):u.run('check')
+        status=u.status();self.assertEqual(status['operation_id'],queued['operation_id']);self.assertEqual(status['outcome'],'available');self.assertTrue(status['completed_at'])
+    def test_check_failure_is_completed_not_permanently_queued(self):
+        u.put(u.STATE/'settings.json',u.DEFAULT)
+        with patch.object(u.os,'geteuid',return_value=0),patch.object(u,'command'):
+            queued=u.broker_action(dict(action='update',operation='check'))
+            with patch.object(u,'catalog',side_effect=OSError('no connection')):
+                with self.assertRaises(OSError):u.run('check')
+        status=u.status();self.assertEqual(status['operation_id'],queued['operation_id']);self.assertEqual(status['outcome'],'failed');self.assertTrue(status['completed_at']);self.assertIn('no connection',status['last_error'])
+    def test_duplicate_queued_operations_are_rejected(self):
+        u.put(u.STATE/'settings.json',u.DEFAULT)
+        with patch.object(u.os,'geteuid',return_value=0),patch.object(u,'command') as command:
+            u.broker_action(dict(action='update',operation='check'))
+            with self.assertRaises(RuntimeError):u.broker_action(dict(action='update',operation='check'))
+        self.assertEqual(command.call_count,1)
+    def test_worker_start_timeout_is_visible(self):
+        from datetime import timedelta
+        u.update_status(phase='Queued',operation='check',queued_at=(datetime.now(timezone.utc)-timedelta(seconds=100)).isoformat(),started_at=None)
+        self.assertEqual(u.status()['outcome'],'timeout')
+    def test_bootstrap_rejects_stale_channel_before_installation(self):
+        with patch.object(u.os,'geteuid',return_value=0),patch.object(u.pwd,'getpwnam'),patch.object(u,'catalog',return_value=self.value),patch.object(u,'legacy_hardware') as migrate:
+            with self.assertRaises(RuntimeError):u.bootstrap()
+        migrate.assert_not_called()

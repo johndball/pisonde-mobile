@@ -1,0 +1,30 @@
+name: Publish versioned releases
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'releases/**'
+      - 'release-notes/**'
+      - 'updates/stable.json'
+      - 'CHANGELOG.md'
+      - 'tools/publish_releases.py'
+      - '.github/workflows/releases.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: pisonde-release-publisher
+  cancel-in-progress: false
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out reviewed source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Publish tags and release notes
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: python3 tools/publish_releases.py

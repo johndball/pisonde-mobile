@@ -11,11 +11,30 @@ CONTENT=r'''<h1>Software updates</h1>
 <p id="result" role="status"></p><pre id="details" style="white-space:pre-wrap;overflow-wrap:anywhere"></pre>
 <script>
 const token={{token|tojson}},auto=document.getElementById('automatic'),result=document.getElementById('result');
-async function call(value){const r=await fetch('/api/updates',{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':token},body:JSON.stringify(value)});const v=await r.json();if(!r.ok)throw Error(v.error||'Update operation failed');return v;}
-async function refresh(){try{const r=await fetch('/api/updates',{cache:'no-store'});const s=await r.json();if(!r.ok)throw Error(s.error||'Update status unavailable');auto.checked=s.automatic;auto.disabled=false;document.getElementById('summary').textContent='Installed: '+s.installed_version+' · Available: '+(s.available_version||'not checked')+' · '+(s.phase||'Ready');document.getElementById('details').textContent='Last check: '+(s.last_check||'never')+'\nLast successful install: '+(s.last_success||'none')+(s.last_error?'\n'+s.last_error:'');}catch(e){result.textContent=e.message;}}
-auto.onchange=async()=>{auto.disabled=true;try{await call({operation:'set_auto',enabled:auto.checked});result.textContent=auto.checked?'Automatic installation enabled.':'Automatic installation paused.';}catch(e){result.textContent=e.message;}await refresh();};
-for(const action of ['check','install'])document.getElementById(action).onclick=async()=>{if(action==='install'&&!confirm('Install the available stable update now? Reception will pause briefly.'))return;try{await call({operation:action});result.textContent=action==='check'?'Check queued.':'Installation queued. This page may briefly disconnect.';}catch(e){result.textContent=e.message;}};
-refresh();setInterval(refresh,5000);
+let pending=null,refreshing=false;
+async function bounded(url,options={}){const abort=new AbortController(),timer=setTimeout(()=>abort.abort(),10000);try{return await fetch(url,{...options,signal:abort.signal,cache:'no-store'});}catch(e){if(e.name==='AbortError')throw Error('Connection timed out. Status will retry automatically.');throw e;}finally{clearTimeout(timer);}}
+async function call(value){const r=await bounded('/api/updates',{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':token},body:JSON.stringify(value)});const v=await r.json();if(!r.ok)throw Error(v.error||'Update operation failed');return v;}
+function render(s){
+ auto.checked=s.automatic;auto.disabled=false;
+ document.getElementById('summary').textContent='Installed: '+s.installed_version+' · Available: '+(s.available_version||'not checked')+' · '+(s.phase||'Ready')+(s.running_version&&s.running_version!==s.installed_version?' · Running: '+s.running_version:'');
+ document.getElementById('details').textContent='Last check: '+(s.last_check||'never')+'\nLast successful install: '+(s.last_success||'none')+(s.available_commit?'\nAvailable source: '+s.available_commit.slice(0,12):'')+(s.last_error?'\n'+s.last_error:'');
+ if(pending){
+  const matching=s.operation_id===pending.id,elapsed=Date.now()-pending.start;
+  if(matching&&s.completed_at){result.textContent=(s.phase||'Completed')+(s.last_error?': '+s.last_error:'');pending=null;}
+  else if(elapsed>pending.limit||elapsed>90000&&(!matching||!s.started_at)){result.textContent='Update operation timed out or did not start. Check the connection and worker log; automatic status refresh continues.';pending=null;}
+  else result.textContent=matching?(s.phase||'Working…'):'Waiting for update worker…';
+ }else result.textContent=(s.phase||'Ready')+(s.last_error?': '+s.last_error:'');
+ document.getElementById('check').disabled=!!pending;document.getElementById('install').disabled=!!pending;
+}
+async function refresh(){if(refreshing)return;refreshing=true;try{const r=await bounded('/api/updates');const s=await r.json();if(!r.ok)throw Error(s.error||'Update status unavailable');render(s);}catch(e){result.textContent=e.message+' Retrying…';if(pending&&Date.now()-pending.start>pending.limit){pending=null;document.getElementById('check').disabled=false;document.getElementById('install').disabled=false;result.textContent='Update status timed out. Automatic refresh continues; check the connection.';}}finally{refreshing=false;}}
+auto.onchange=async()=>{auto.disabled=true;try{await call({operation:'set_auto',enabled:auto.checked});}catch(e){result.textContent=e.message;}await refresh();};
+for(const action of ['check','install'])document.getElementById(action).onclick=async()=>{
+ if(action==='install'&&!confirm('Install the available stable update now? Reception will pause briefly.'))return;
+ document.getElementById('check').disabled=true;document.getElementById('install').disabled=true;result.textContent='Queueing '+action+'…';
+ try{const value=await call({operation:action});pending={id:value.operation_id,start:Date.now(),limit:action==='check'?360000:900000};result.textContent='Queued; waiting for worker…';await refresh();}
+ catch(e){result.textContent=e.message;document.getElementById('check').disabled=false;document.getElementById('install').disabled=false;}
+};
+refresh();setInterval(refresh,2000);
 </script>'''
 
 def install(module):
@@ -28,7 +47,13 @@ def install(module):
             if not isinstance(value,dict):return jsonify(error='Invalid update request'),400
         if value.get('operation') not in ('status','set_auto','check','install'):return jsonify(error='Invalid update action'),400
         try:
-            return jsonify(f.broker('update',**value))
+            data=f.broker('update',**value)
+            if value.get('operation')=='status':data['running_version']=module.VERSION
+            return jsonify(data)
         except Exception as exc:return jsonify(error=str(exc)),503
+    @module.app.after_request
+    def no_cache(response):
+        if request.path in ('/updates','/api/updates'):response.headers['Cache-Control']='no-store'
+        return response
     module.app.add_url_rule('/updates','updates_page',page)
     module.app.add_url_rule('/api/updates','updates_api',api,methods=['GET','POST'])

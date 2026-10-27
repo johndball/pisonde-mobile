@@ -1,6 +1,6 @@
 # Automatic application updates
 
-PiSonde Mobile 0.3.12 adds an Updates page and a root-owned systemd worker. No GitHub token is needed for this public repository.
+PiSonde Mobile 0.3.13 adds an Updates page and a root-owned systemd worker. No GitHub token is needed for this public repository.
 
 ## Existing hardware: one-time setup
 
@@ -10,7 +10,7 @@ Keep the Pi on stable power with Internet access. Installation briefly stops rec
 curl --fail --location --max-time 60 https://raw.githubusercontent.com/johndball/pisonde-mobile/main/bootstrap-updates.sh -o /tmp/pisonde-updates.sh && sudo bash /tmp/pisonde-updates.sh
 ```
 
-This fetches the stable manifest over HTTPS, verifies the updater's SHA-256, then downloads the listed application files from the manifest's immutable source commit and checks each hash. The repository owner's stable-channel publishing permission is the trust boundary; hashes detect corrupt or mismatched content, not a compromised publisher. No private configuration is uploaded.
+This fetches the stable manifest from the GitHub contents API over HTTPS, verifies the updater's SHA-256, then downloads the listed application files from the manifest's immutable source commit and checks each hash. The repository owner's stable-channel publishing permission is the trust boundary; hashes detect corrupt or mismatched content, not a compromised publisher. No private configuration is uploaded.
 
 For the original installation, setup extracts existing adapter identities from local Python constants into a local hardware configuration. It never rewrites saved NetworkManager profiles or passwords. Existing scanner settings, upload identity, reception database and logs remain in place. If it cannot safely identify the installed hardware configuration, setup stops for review.
 
@@ -25,7 +25,7 @@ Open **http://192.168.73.1/updates** or select **Updates** from the receiver pag
 - **Install now:** checks, downloads and installs a newer stable version immediately; reception pauses briefly.
 - Installed/available versions, last check, last successful installation and errors appear on the page. It refreshes without reloading the full page.
 
-The systemd timer checks about ten minutes after boot, every six hours thereafter and daily around 03:15. Checks/installations require Internet at that time. Missed checks are retried at later timer runs; an offline Pi continues receiving with its existing application. The checkbox does not disable checking. Confirm the Pi's timezone with `timedatectl` before relying on the maintenance window.
+The systemd timer checks about ten minutes after boot, every six hours thereafter and daily around 03:15. Checks/installations require Internet at that time. Missed checks are retried at later timer runs; an offline Pi continues receiving with its existing application. The checkbox does not disable checking. The page polls every two seconds, replaces queued messages with progress/completion, reports worker-start and connection timeouts, and displays the running version if it differs from the source on disk. Confirm the Pi's timezone with `timedatectl` before relying on the maintenance window.
 
 ## Recovery and limits
 
@@ -47,6 +47,10 @@ systemctl list-timers pisonde-update.timer --no-pager
 sudo journalctl -u pisonde-update-run.service -u pisonde-update-install.service -n 40 --no-pager
 ```
 
-Confirm **0.3.12** on the dashboard, the Updates checkbox is checked, and sample flow/reception resumes. Select **Check now** and confirm **Up to date**. Reboot during a convenient maintenance period and confirm the AP and receiver return. Hardware installation is not verified until these device-side checks succeed.
+Confirm **0.3.13** on the dashboard, the Updates checkbox is checked, and sample flow/reception resumes. Select **Check now** and confirm **Up to date**. Reboot during a convenient maintenance period and confirm the AP and receiver return. Hardware installation is not verified until these device-side checks succeed.
 
 All web-changing actions require the existing CSRF token and go through a narrow root broker with fixed operation names. The local dashboard uses HTTP: keep it on a trusted network and do not expose it directly to the Internet.
+
+## Release notes
+
+Read [CHANGELOG.md](CHANGELOG.md) or the repository's GitHub Releases page. Tags/Releases document tested source snapshots; they do not independently change the device's stable channel. A repository workflow publishes the reviewed version catalog under `releases/` and refuses to move an existing version tag.
