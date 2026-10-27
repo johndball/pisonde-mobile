@@ -8,6 +8,7 @@ class PublicSetupTests(unittest.TestCase):
     def setUp(self):
         self.temp=tempfile.TemporaryDirectory();self.addCleanup(self.temp.cleanup)
         self.root=Path(self.temp.name)
+        self.trust_patch=patch('update_manager.trusted_key');self.trust_patch.start();self.addCleanup(self.trust_patch.stop)
         self.update_patch=patch('update_manager.install_support');self.update_patch.start();self.addCleanup(self.update_patch.stop)
         self.data=dict(onboard_mac='02:00:00:00:00:01',client_mac='02:00:00:00:00:02',ap_uuid='11111111-2222-4333-8444-555555555555',sdr_serial='DEMO_SDR')
     def load(self):
@@ -79,3 +80,13 @@ class PublicSetupTests(unittest.TestCase):
         adapters.assert_not_called()
     def test_adapter_role_selection_rejects_ambiguous_hardware(self):
         with self.assertRaises(RuntimeError):configure.choose({},True,'USB')
+
+    def test_missing_enrollment_stops_setup_before_wifi_changes(self):
+        config=self.root/'absent.json'
+        with patch.object(configure,'CONFIG',config),patch.object(configure.os,'geteuid',return_value=0),patch.object(configure.sys,'argv',['configure.py']),patch('update_manager.trusted_key',side_effect=RuntimeError('not enrolled')),patch.object(configure,'adapters') as adapters:
+            with self.assertRaises(RuntimeError):configure.main()
+        adapters.assert_not_called()
+    def test_missing_enrollment_stops_activation_before_wifi_changes(self):
+        with patch('update_manager.trusted_key',side_effect=RuntimeError('not enrolled')),patch.object(configure,'nm') as nm:
+            with self.assertRaises(RuntimeError):configure.activate()
+        nm.assert_not_called()

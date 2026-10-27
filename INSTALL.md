@@ -1,6 +1,6 @@
-# Install PiSonde Mobile 0.3.15 — public packaging revision 1
+# Install PiSonde Mobile 0.3.16 — public packaging revision 1
 
-This is a **fresh-install source package**, not an update for an existing PiSonde installation. The receiver/GUI code is based on 0.3.15. Public packaging adds hardware discovery and removes installation-specific identities. **This fresh-SD installer has passed offline checks but has not yet been run end-to-end on a Raspberry Pi.** Keep your working card intact and use a spare card for the first installation.
+This is a **fresh-install source package**, not an update for an existing PiSonde installation. The receiver/GUI code is based on 0.3.16. Public packaging adds hardware discovery and removes installation-specific identities. **This fresh-SD installer has passed offline checks but has not yet been run end-to-end on a Raspberry Pi.** Keep your working card intact and use a spare card for the first installation.
 
 ## Requirements
 
@@ -22,14 +22,14 @@ On the Pi, using Ethernet or a local console:
 sudo apt-get update
 sudo apt-get install -y git
 cd ~
-git clone https://github.com/johndball/pisonde-mobile.git
+git clone --branch v0.3.16 --depth 1 https://github.com/johndball/pisonde-mobile.git
 cd pisonde-mobile
 sudo bash install.sh
 ```
 
-You can also download the repository ZIP from GitHub, extract it, and run `sudo bash install.sh` from the extracted directory.
+Use the tagged release source; a development branch or newer un-published source will fail the signed file checks. You can also download the tagged release ZIP from GitHub, extract it, and run `sudo bash install.sh` from the extracted directory.
 
-Installation downloads dependencies, checks out pinned Horus and radiosonde decoder sources, builds the DFM/RS41/detection executables, and compiles a separate rate-capped survey tool. It does not replace the system RTL-SDR library or start reception yet. Internet access to Debian/Raspberry Pi package mirrors, GitHub and Python package indexes is required.
+Installation first fetches the version-specific signed manifest and verifies the bundled public key and all ten application files. OpenSSL/CA certificates may be installed to perform this check. A missing, expired or mismatched manifest stops application installation. It then downloads dependencies, checks out pinned Horus and radiosonde decoder sources, builds the DFM/RS41/detection executables, and compiles a separate rate-capped survey tool. It does not replace the system RTL-SDR library or start reception yet. After building, it rechecks the installed application bytes, sets `/etc/pisonde-mobile` to root:root mode 0755, and enrolls the root-owned public key automatically. Directory normalization does not recursively change file ownership. Internet access to Debian/Raspberry Pi package mirrors, GitHub and Python package indexes is required.
 
 The installer refuses an existing `/opt/pisonde-mobile` directory. If it fails partway, keep the error output and resolve it before retrying; do not delete an existing working installation to bypass that check. This package does not offer an in-place migration or full installer rollback.
 
@@ -128,4 +128,4 @@ Fresh setup installs the background update timer and Updates page. See [UPDATES.
 
 ## Signed update enrollment
 
-After hardware/AP configuration, follow [SIGNED-UPDATES.md](SIGNED-UPDATES.md) to enroll the publisher public key using the independently verified installer. Automatic signed updates will fail closed until this step succeeds. The first signed manifest must be published before enrollment.
+Fresh installations of 0.3.16 and newer enroll the publisher public key during `install.sh`; no separate enrollment command is needed. Hardware setup verifies the enrolled key before changing Wi-Fi. After configuration, use Updates → Check now and confirm that signatures are required and the key is enrolled. Existing enrolled devices update normally through the GUI. Unenrolled older installations still use the one-time verified enrollment installer described in [SIGNED-UPDATES.md](SIGNED-UPDATES.md).

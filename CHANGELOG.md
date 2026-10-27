@@ -2,6 +2,16 @@
 
 Application versions, stable-channel deployments and GitHub Releases are related but distinct. An enrolled device installs only the immutable source snapshot authenticated by `updates/signed-stable.json` (legacy devices use `updates/stable.json`); publishing a tag alone does not deploy code. GitHub Releases are available from the repository's Releases page.
 
+## 0.3.16 — 2026-10-27, signed publication pending
+
+- Integrate signed manifest verification and public-key enrollment into fresh installation. New users complete normal install/hardware setup without a separate enrollment command.
+- Explicitly create or normalize the configuration directory as root:root mode 0755, fixing service-owned directory enrollment failures. Preserve ownership of individual existing files and reject symlink directories.
+- Verify version-specific signed metadata and all application source bytes before copying; recheck installed files before enrolling trust. Refuse configured devices/history and conflicting trust keys.
+- Require a valid enrolled key before fresh hardware/AP configuration changes Wi-Fi roles.
+- Publish version-specific signed metadata alongside the stable channel, allowing tagged source installation independently of later stable releases.
+- Existing enrolled devices retain GUI/automatic updates and local settings/history. The app-only updater does not rerun the fresh installer.
+- Pass 194 offline regression checks, including real signature/enrollment tests and directory-permission normalization. A fresh-card arm64/Trixie installation remains a separate hardware validation task.
+
 ## 0.3.15 — 2026-10-27
 
 - Add a separate signed channel while preserving the 0.3.14 legacy channel and all historical releases.

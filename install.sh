@@ -8,12 +8,20 @@ set -euo pipefail
 DEST=/opt/pisonde-mobile
 [ ! -e "$DEST" ] || { echo 'Existing installation found. Use a fresh SD card; this installer will not overwrite it.'; exit 1; }
 SOURCE="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+[ ! -e /etc/pisonde-mobile/hardware.json ] && [ ! -e /var/lib/pisonde-mobile/receptions.sqlite3 ] || { echo 'Existing configuration/history found; fresh installation refused.'; exit 1; }
+[ ! -L /etc/pisonde-mobile ] || { echo 'Configuration directory must not be a symlink.'; exit 1; }
+WORK="$(mktemp -d /tmp/pisonde-fresh.XXXXXXXX)"
+trap 'rm -rf "$WORK"' EXIT
 apt-get update
+apt-get install -y openssl ca-certificates
+# Verify the publisher signature and application bytes before installing them.
+python3 "$SOURCE/fresh_install.py" preflight "$SOURCE" "$WORK/release.json"
 apt-get install -y python3-venv python3-dev git build-essential pkg-config libffi-dev libusb-1.0-0-dev librtlsdr-dev rtl-sdr usbutils sox direwolf network-manager ethtool iw libfftw3-dev
 getent group plugdev >/dev/null || groupadd --system plugdev
 id pisonde-mobile >/dev/null 2>&1 || useradd --system --user-group --home-dir /var/lib/pisonde-mobile --shell /usr/sbin/nologin pisonde-mobile
 usermod -a -G plugdev pisonde-mobile
-install -d -m 0755 "$DEST" "$DEST/bin" /etc/pisonde-mobile
+# Set ownership explicitly even if the configuration directory already exists.
+install -d -o root -g root -m 0755 "$DEST" "$DEST/bin" /etc/pisonde-mobile
 install -m 0644 "$SOURCE"/*.py "$DEST/"
 install -m 0644 "$SOURCE/requirements.txt" "$DEST/"
 install -d -o pisonde-mobile -g pisonde-mobile -m 0750 /var/lib/pisonde-mobile /var/log/pisonde-mobile
@@ -63,7 +71,9 @@ udevadm control --reload-rules
 install -m 0644 "$SOURCE"/systemd/* /etc/systemd/system/
 systemctl daemon-reload
 "$DEST/venv/bin/python" -m pip freeze > "$DEST/installed-python-versions.txt"
-echo 'Installed 0.3.10 public packaging revision 1. Services are not started yet.'
+python3 "$SOURCE/fresh_install.py" enroll "$SOURCE" "$WORK/release.json"
+echo 'Installed signed PiSonde Mobile 0.3.16. Services are not started yet.'
+echo 'Public key enrolled automatically; no separate enrollment command is needed.' 
 echo 'Reboot to release the TV driver, then use Ethernet or a local console:'
 echo 'sudo python3 /opt/pisonde-mobile/configure.py'
 echo 'If installation failed partway, inspect the error; do not remove an existing installation blindly.'

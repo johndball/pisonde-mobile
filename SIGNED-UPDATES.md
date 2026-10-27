@@ -1,6 +1,6 @@
-# Signed application updates — 0.3.15
+# Signed application updates
 
-The first signed manifest is published for version 0.3.15 with metadata sequence 1. Older devices stay on the legacy `updates/stable.json` channel at 0.3.14 until explicitly enrolled. Historical releases/tags remain unchanged.
+Signed updates began with 0.3.15, metadata sequence 1. Fresh-install integration begins with 0.3.16; it requires the publisher-signed, version-specific manifest to be published. Older devices stay on the legacy `updates/stable.json` channel at 0.3.14 until explicitly enrolled. Historical releases/tags remain unchanged.
 
 Publisher public-key SHA256: `34e43261378f0235107cc0d1e3eb8d2bed7d44c44d995323d7646203235dbfd0`.
 
@@ -47,7 +47,7 @@ On an existing configured Pi, download `enroll-signed-updates.py` from the revie
 
 Run the verified installer with `sudo python3 /tmp/pisonde-enroll.py`. It pins the publisher key above, verifies the signed catalog before fetching executable code, verifies the updater's signed checksum, enrolls the public key, and runs the normal application backup/install/health workflow. A failed transition leaves the automatic-update timer stopped; resolve it before re-enabling updates.
 
-Fresh installations must finish hardware/AP configuration first, then use the same enrollment step. Initial source installation and key enrollment are trust-establishment operations: do not accept an installer/fingerprint solely from a repository you suspect is compromised. The existing bootstrap entry point delegates to the hash-pinned enrollment installer, but verifying a downloaded bootstrap itself is still necessary for independent initial trust.
+Fresh installations of 0.3.16 and newer perform key enrollment during `install.sh` before hardware/AP configuration, with `/etc/pisonde-mobile` explicitly owned by root:root at mode 0755. They do not need this separate enrollment command. Unenrolled older installations use the one-time verified installer above. Initial source installation and key enrollment are trust-establishment operations: do not accept an installer/fingerprint solely from a repository you suspect is compromised. The existing bootstrap entry point delegates to the hash-pinned enrollment installer, but verifying a downloaded bootstrap itself is still necessary for independent initial trust.
 
 After enrollment, `/api/updates` reports `signatures_required: true`, `signing_enrolled: true`, and the accepted signing key ID. Confirm the version, key ID, timer/service state and RF reception on the device. No private signing key is needed by a receiving Pi.
 
@@ -62,3 +62,7 @@ A root-owned `signature-state.json` remembers the highest accepted sequence and 
 The default metadata validity is 90 days. Renew it before expiry; expiry is an intentional stop to updates, not to radio reception. Clock errors can prevent updates. This is a single-key signed-manifest design, not a full implementation of The Update Framework. It does not promise availability if a repository attacker hides updates.
 
 Key replacement/recovery is deliberately a manual, authenticated enrollment operation in this first revision, using an independently checked new fingerprint. Automatic key rotation and multi-key thresholds are not implemented. Losing the only private key requires operator re-enrollment with a new public key; losing only its password has the same effect unless it is recovered. A key supplied solely by a compromised GitHub repository must never be trusted as a replacement.
+
+## Version-specific installation metadata
+
+Each release from 0.3.16 onward publishes its signed manifest both as the current `updates/signed-stable.json` and as `updates/releases/VERSION.json`. Fresh installation requests the version-specific copy through the GitHub contents API, verifies it with the bundled pinned key, then matches all application bytes against its hashes. An older source tag does not have to match a newer stable release. Expiry and signature checks still apply; renew version-specific metadata before expiry if that version remains supported for new installations.

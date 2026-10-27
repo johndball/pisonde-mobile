@@ -63,6 +63,8 @@ def rollback(state):
     CONFIG.unlink(missing_ok=True)
 
 def activate():
+    from update_manager import trusted_key
+    trusted_key()
     state=json.loads(STATE.read_text());data=state['hardware']
     try:
         for row in state['profiles']:
@@ -87,6 +89,8 @@ def main():
     if sys.argv[1:]==['--activate']:return activate()
     if sys.argv[1:]:raise RuntimeError('No arguments required')
     if CONFIG.exists():raise RuntimeError('Already configured; use the dashboard for hotspot and upload settings')
+    from update_manager import trusted_key
+    trusted_key()
     found=adapters();ap=choose(found,False,'Onboard access point');client=choose(found,True,'USB upstream')
     serial=sdr_serial()
     # Check the selected onboard radio can provide an access point.
