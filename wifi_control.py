@@ -189,6 +189,13 @@ class Handler(StreamRequestHandler):
         self.wfile.write(json.dumps(response).encode()+b'\n')
 
 if __name__=='__main__':
+    # Update timer migrations must not prevent field Wi-Fi control starting.
+    try:
+        from update_manager import ensure_support
+        ensure_support()
+    except Exception as exc:
+        import logging
+        logging.error('Updater timer setup failed: %s',exc)
     ensure()
     Path(SOCKET).unlink(missing_ok=True)
     server=ThreadingUnixStreamServer(SOCKET,Handler)

@@ -1,6 +1,6 @@
 # Automatic application updates
 
-PiSonde Mobile 0.3.13 adds an Updates page and a root-owned systemd worker. No GitHub token is needed for this public repository.
+PiSonde Mobile 0.3.14 adds an Updates page and a root-owned systemd worker. No GitHub token is needed for this public repository.
 
 ## Existing hardware: one-time setup
 
@@ -20,16 +20,24 @@ Use a supported 0.3.10 installation with the existing Python virtual environment
 
 Open **http://192.168.73.1/updates** or select **Updates** from the receiver page.
 
-- **Automatic updates:** checked by default on first setup. Allows installation from 03:00 to 05:00 in the Pi's local timezone. Unchecking preserves background checks and manual installation.
-- **Check now:** checks and stages a newer stable version without installing it.
-- **Install now:** checks, downloads and installs a newer stable version immediately; reception pauses briefly.
-- Installed/available versions, last check, last successful installation and errors appear on the page. It refreshes without reloading the full page.
+- **Install during scheduled maintenance window:** choose a two-hour window in 24-hour time: 0100–0300, **0300–0500**, 0500–0700, 0700–0900, continuing through 2300–0100. All times use the Pi's local timezone.
+- **If update window missed, install at next reboot:** allows installation outside the window during the next boot's worker run, but only when an update was already known before a selected window ended. It also works on its own, using the selected window to define what was missed. A version first discovered after boot does not qualify for that boot. Failed attempts retain eligibility for retry.
+- **Immediately install pending updates when a new version is available:** installs as soon as a check detects/stages an update, including **Check now**, regardless of the selected window. Saving this option also queues a worker run for an already pending update.
+- **Save update settings:** saves all three options and the window together. Unsaved selections survive status refreshes.
+- **Check now:** refreshes/stages the stable version; installs only if immediate installation is enabled.
+- **Install now:** installs immediately regardless of the three options. Reception pauses briefly.
 
-The systemd timer checks about ten minutes after boot, every six hours thereafter and daily around 03:15. Checks/installations require Internet at that time. Missed checks are retried at later timer runs; an offline Pi continues receiving with its existing application. The checkbox does not disable checking. The page polls every two seconds, replaces queued messages with progress/completion, reports worker-start and connection timeouts, and displays the running version if it differs from the source on disk. Confirm the Pi's timezone with `timedatectl` before relying on the maintenance window.
+Any combination is allowed. Immediate installation takes priority; otherwise scheduled and missed-window installation are alternative opportunities. With all three unchecked, only manual installation is allowed. Existing automatic-on settings migrate to scheduled **0300–0500**, with the two new options off. An existing automatic-off setting keeps all three off. No automatic Pi reboot is performed.
+
+The systemd worker runs about ten minutes after boot (plus up to five minutes of random delay), hourly near :15 to evaluate the selected window, and on persistent timer catch-up. An hourly or catch-up event can run earlier in startup. It contacts GitHub about every six hours, reusing the staged manifest between checks. **Check now** always requests a fresh manifest. An offline check is retried at later worker runs; a fully downloaded update can be installed without downloading it again. Newly discovered updates require Internet for download. Confirm the Pi's timezone with `timedatectl`.
+
+Installed/available versions, last check, last successful installation and errors appear on the page. Status refreshes every two seconds without reloading the page, with connection/worker timeouts. Manual installation and automatic installation share the same backup, integrity and health checks.
 
 ## Recovery and limits
 
-Only the explicit application-file manifest is applied. The updater does not run the fresh-install script, modify OS packages, rebuild decoders, install new Python dependencies, change service definitions during routine updates or perform database schema migrations. Releases needing those changes require a separate reviewed installer. Ordinary `main` commits do not deploy: a publisher must move `updates/stable.json` to a tested immutable source commit with compatibility `app-only-v1` and matching hashes.
+Only the explicit application-file manifest is applied. The updater does not run the fresh-install script, modify OS packages, rebuild decoders, install new Python dependencies, perform database schema migrations or change receiver service definitions (apart from the existing update-recovery dependency). Releases needing those changes require a separate reviewed installer. Ordinary `main` commits do not deploy: a publisher must move `updates/stable.json` to a tested immutable source commit with compatibility `app-only-v1` and matching hashes.
+
+Version 0.3.14 also migrates the updater-owned timer once through the root Wi-Fi broker when the new application starts. It does not change Wi-Fi roles or saved profiles. This migration allows existing web-updated devices to use every selectable window without an SSH setup command.
 
 Before installation, the worker stages and compiles every Python source file, verifies its version/hashes, checks space, makes a checked SQLite backup and stores previous source files. A durable pending-transaction record is written before stopping services. Source files are replaced atomically, then the receiver and Wi-Fi broker restart. Service state, the application's API version and SQLite integrity must pass health checks, or the previous application is restored. This does not prove RF reception or successful Internet telemetry delivery.
 
@@ -47,7 +55,7 @@ systemctl list-timers pisonde-update.timer --no-pager
 sudo journalctl -u pisonde-update-run.service -u pisonde-update-install.service -n 40 --no-pager
 ```
 
-Confirm **0.3.13** on the dashboard, the Updates checkbox is checked, and sample flow/reception resumes. Select **Check now** and confirm **Up to date**. Reboot during a convenient maintenance period and confirm the AP and receiver return. Hardware installation is not verified until these device-side checks succeed.
+Confirm **0.3.14** on the dashboard, the Updates controls match your chosen policy, and sample flow/reception resumes. Select **Check now** and confirm **Up to date**. Reboot during a convenient maintenance period and confirm the AP and receiver return. Hardware installation is not verified until these device-side checks succeed.
 
 All web-changing actions require the existing CSRF token and go through a narrow root broker with fixed operation names. The local dashboard uses HTTP: keep it on a trusted network and do not expose it directly to the Internet.
 

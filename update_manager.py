@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Root-owned, app-only stable-channel updater. Never changes radio configuration."""
 import ast,base64,contextlib,fcntl,hashlib,json,logging,os,pwd,re,shutil,sqlite3,subprocess,sys,tempfile,time,urllib.request,uuid
-from datetime import datetime,timezone
+from datetime import datetime,timezone,timedelta
 from pathlib import Path
 
 APP=Path('/opt/pisonde-mobile')
@@ -12,10 +12,11 @@ HARDWARE=Path('/etc/pisonde-mobile/hardware.json')
 RAW='https://raw.githubusercontent.com/johndball/pisonde-mobile/'
 API='https://api.github.com/repos/johndball/pisonde-mobile/'
 CHANNEL=API+'contents/updates/stable.json?ref=main'
-UPDATER_VERSION='0.3.13'
+UPDATER_VERSION='0.3.14'
 FILES={'mobile.py','field_features.py','field_ui.py','wifi_control.py','sdr_health.py','hardware.py','storage_maintenance.py','verify_recovery.py','update_manager.py','update_ui.py'}
 UNITS=('pisonde-wifi-control.service','pisonde-mobile.service')
-DEFAULT={'automatic':True,'window_start':3,'window_end':5}
+DEFAULT={'scheduled':True,'reboot_if_missed':False,'immediate':False,'window_start':3,'window_end':5}
+WINDOWS=tuple((start,(start+2)%24) for start in range(1,24,2))
 
 def now():return datetime.now(timezone.utc).isoformat()
 def atomic(path,data,mode=0o644):
@@ -34,11 +35,47 @@ def put(path,value):atomic(path,(json.dumps(value,indent=2)+'\n').encode())
 def read(path,default=None):
     if not path.exists():return default
     return json.loads(path.read_text())
-def settings():
-    value=read(STATE/'settings.json',DEFAULT)
-    if set(value)!=set(DEFAULT) or type(value['automatic']) is not bool or any(type(value[k]) is not int or not 0<=value[k]<=23 for k in ('window_start','window_end')) or value['window_start']>=value['window_end']:
-        raise RuntimeError('Invalid update settings')
+def validate_settings(value):
+    if not isinstance(value,dict) or set(value)!=set(DEFAULT):raise RuntimeError('Invalid update settings')
+    if any(type(value[k]) is not bool for k in ('scheduled','reboot_if_missed','immediate')):
+        raise RuntimeError('Update options must be true or false')
+    if any(type(value[k]) is not int for k in ('window_start','window_end')) or (value['window_start'],value['window_end']) not in WINDOWS:
+        raise RuntimeError('Choose a listed two-hour maintenance window')
     return value
+
+def settings():
+    value=read(STATE/'settings.json',dict(DEFAULT))
+    # Read the previous on/off schema without enabling any new behavior.
+    if isinstance(value,dict) and set(value)=={'automatic','window_start','window_end'}:
+        value=dict(scheduled=value['automatic'],reboot_if_missed=False,immediate=False,
+                   window_start=value['window_start'],window_end=value['window_end'])
+    return validate_settings(value)
+
+def window_label(cfg):return f"{cfg['window_start']:02d}00–{cfg['window_end']:02d}00 local time"
+def in_window(cfg,local):
+    start,end=cfg['window_start'],cfg['window_end']
+    return start<=local.hour<end if start<end else local.hour>=start or local.hour<end
+
+def last_window_end(cfg,local):
+    end=local.replace(hour=cfg['window_end'],minute=0,second=0,microsecond=0)
+    return end if end<=local else end-timedelta(days=1)
+
+def boot_id():return Path('/proc/sys/kernel/random/boot_id').read_text().strip()
+def boot_time(local):
+    return local-timedelta(seconds=float(Path('/proc/uptime').read_text().split()[0]))
+
+def install_reason(cfg,action,policy,local,current_boot,boot_started):
+    if action=='install':return 'Manual installation'
+    if cfg['immediate']:return 'Install immediately when available'
+    if cfg['scheduled'] and in_window(cfg,local):
+        return 'Scheduled maintenance window' if action=='run' else ''
+    if action=='run' and cfg['reboot_if_missed'] and policy.get('boot_id')!=current_boot:
+        seen=datetime.fromisoformat(policy['available_since'])
+        # Only an update already known before a completed window qualifies.
+        if seen.astimezone(boot_started.tzinfo)<last_window_end(cfg,boot_started):
+            return 'Missed maintenance window; next reboot'
+    return ''
+
 
 def version(value):
     if not isinstance(value,str) or not re.fullmatch(r'\d+\.\d+\.\d+',value):raise RuntimeError('Invalid stable version')
@@ -118,7 +155,8 @@ def status():
     if value.get('phase')=='Queued' and value.get('queued_at') and not value.get('started_at'):
         age=(datetime.now(timezone.utc)-datetime.fromisoformat(value['queued_at'])).total_seconds()
         if age>90:value.update(phase='Update worker did not start',outcome='timeout',completed_at=now(),last_error='Queued operation exceeded 90 seconds; inspect the update worker log')
-    value.update(automatic=settings()['automatic'],window='03:00–05:00 local time',installed_version=app_version(),configured=(STATE/'settings.json').exists())
+    cfg=settings()
+    value.update(cfg,automatic=any(cfg[k] for k in ('scheduled','reboot_if_missed','immediate')),window=window_label(cfg),installed_version=app_version(),configured=(STATE/'settings.json').exists())
     return value
 
 @contextlib.contextmanager
@@ -211,17 +249,33 @@ def run(action):
         update_status(operation_id=ident,operation=action,started_at=now(),completed_at=None,outcome=None,phase='Checking',last_error='',last_result='')
         try:
             recover_running()
-            value=catalog();installed=app_version()
-            update_status(last_check=now(),available_version=value['version'],available_commit=value['commit'],channel_blob_sha=value.get('channel_blob_sha',''))
+            cfg=settings();cached=read(STATE/'available.json')
+            checked=read(STATE/'status.json',{}).get('last_check')
+            fresh=checked and 0<=(datetime.now(timezone.utc)-datetime.fromisoformat(checked)).total_seconds()<6*3600
+            if action=='run' and fresh and cached:
+                value=validate(cached)
+            else:
+                value=catalog();put(STATE/'available.json',value)
+                update_status(last_check=now())
+            installed=app_version()
+            update_status(available_version=value['version'],available_commit=value['commit'],channel_blob_sha=value.get('channel_blob_sha',''))
             if version(value['version'])<=version(installed):
                 update_status(phase='Up to date',outcome='up_to_date',completed_at=now());return
-            update_status(phase='Downloading update')
-            folder=stage(value)
-            cfg=settings();hour=datetime.now().hour
-            automatic=action=='run' and cfg['automatic'] and cfg['window_start']<=hour<cfg['window_end']
-            if action=='install' or automatic:
+            cfg=settings();local=datetime.now().astimezone();current_boot=boot_id()
+            policy=read(STATE/'policy.json',{})
+            if policy.get('commit')!=value['commit']:
+                policy=dict(commit=value['commit'],available_since=now(),boot_id=policy.get('boot_id'))
+            # Persist first discovery even if download fails, without consuming a boot retry.
+            put(STATE/'policy.json',policy)
+            reason=install_reason(cfg,action,policy,local,current_boot,boot_time(local))
+            update_status(phase='Downloading update',install_reason=reason)
+            folder=STATE/'staged'/value['commit']
+            if not folder.is_dir():folder=stage(value)
+            if action=='install' or reason:
                 apply(value,folder);update_status(outcome='installed',completed_at=now())
             else:update_status(phase='Update downloaded; ready to install',outcome='available',completed_at=now())
+            if action=='run':
+                policy['boot_id']=current_boot;put(STATE/'policy.json',policy)
         except Exception as exc:
             rolled_back=read(STATE/'status.json',{}).get('last_result')=='rolled_back'
             update_status(phase='Rolled back' if rolled_back else 'Update check/install failed',outcome='rolled_back' if rolled_back else 'failed',completed_at=now(),last_error=str(exc)[:300])
@@ -230,12 +284,19 @@ def run(action):
 def broker_action(value):
     if os.geteuid()!=0:raise RuntimeError('Update control requires root broker')
     action=value.get('operation')
-    expected={'action','operation','enabled'} if action=='set_auto' else {'action','operation'}
+    expected={'action','operation','settings'} if action=='set_policy' else {'action','operation','enabled'} if action=='set_auto' else {'action','operation'}
     if set(value)!=expected:raise RuntimeError('Unexpected update parameters')
     if action=='status':return status()
     if action=='set_auto':
         if type(value['enabled']) is not bool:raise RuntimeError('Automatic updates must be true or false')
-        cfg=settings();cfg['automatic']=value['enabled'];put(STATE/'settings.json',cfg);return status()
+        cfg=settings();cfg.update(scheduled=value['enabled'],reboot_if_missed=False,immediate=False)
+        put(STATE/'settings.json',cfg);return status()
+    if action=='set_policy':
+        cfg=validate_settings(value['settings'])
+        with locked():put(STATE/'settings.json',cfg)
+        if cfg['immediate']:
+            command(['systemctl','start','--no-block','pisonde-update-run.service'])
+        return status()
     if action not in ('check','install'):raise RuntimeError('Unsupported update control')
     if not (STATE/'settings.json').exists():raise RuntimeError('Run the one-time updater setup first')
     ident=uuid.uuid4().hex
@@ -282,11 +343,11 @@ UMask=0022
 '''.replace('ACTION',action)
         atomic(units/('pisonde-update-'+action+'.service'),unit.encode())
     timer='''[Unit]
-Description=Check PiSonde stable updates every six hours
+Description=Check PiSonde updates and maintenance policy
 [Timer]
 OnBootSec=10min
 OnUnitActiveSec=6h
-OnCalendar=*-*-* 03:15:00
+OnCalendar=*-*-* *:15:00
 Persistent=true
 RandomizedDelaySec=5min
 Unit=pisonde-update-run.service
@@ -299,7 +360,14 @@ WantedBy=timers.target
     command(['systemctl','daemon-reload'])
     command(['systemctl','enable','pisonde-update-recover.service','pisonde-update.timer'])
     command(['systemctl','start','pisonde-update-recover.service'])
-    if start_timer:command(['systemctl','start','pisonde-update.timer'])
+    if start_timer:command(['systemctl','restart','pisonde-update.timer'])
+    put(STATE/'support.json',{'version':UPDATER_VERSION})
+
+def ensure_support():
+    # The old updater installs application files only. Migrate its timer once from
+    # the newly restarted root broker, without requiring a separate SSH command.
+    if (STATE/'settings.json').exists() and read(STATE/'support.json',{}).get('version')!=UPDATER_VERSION:
+        install_support()
 
 def legacy_hardware():
     path=HARDWARE
@@ -357,7 +425,7 @@ def bootstrap(selected=None):
         atomic(APP/'update_manager.py',(folder/'update_manager.py').read_bytes())
         apply(value,folder)
     command(['systemctl','start','pisonde-update.timer'])
-    print('PASS: PiSonde Mobile '+value['version']+' installed. Automatic installation: '+str(settings()['automatic'])+'; window 03:00–05:00 local time.')
+    print('PASS: PiSonde Mobile '+value['version']+' installed. Automatic installation: '+str(status()['automatic'])+'; window '+window_label(settings())+'.')
     print('Dashboard: http://192.168.73.1/updates')
 
 def main():

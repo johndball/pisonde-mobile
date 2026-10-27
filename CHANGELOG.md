@@ -2,6 +2,16 @@
 
 Application versions, stable-channel deployments and GitHub Releases are related but distinct. A device installs only the immutable source snapshot named in `updates/stable.json`; publishing a tag alone does not deploy code. GitHub Releases are available from the repository's Releases page.
 
+## 0.3.14 — 2026-10-27
+
+- Replace the single automatic-install checkbox with three combinable options: a selectable maintenance window, next-boot installation after a missed window, and immediate installation when a version is detected.
+- Display selectable two-hour windows in 24-hour Pi local time, including 2300–0100. Preserve existing enabled/disabled installation settings; new behaviors default off.
+- Evaluate policy hourly while keeping GitHub checks about six-hourly. Preserve first-discovery and boot identity across restarts so missed-window installation does not apply to a newly discovered version at that boot.
+- Save all settings together; retain unsaved selections through status polling. Immediate mode also applies to manual checks and queues a worker when enabled.
+- Migrate the updater-owned systemd timer on the existing device through the root broker after installation, without a separate SSH bootstrap.
+- Add regression checks for all eight option combinations, local-time/midnight boundaries, reboot eligibility/retries, schema migration, validation and the GUI API.
+- Device-side schedule/reboot validation remains necessary; offline tests cannot establish field reliability.
+
 ## 0.3.13 — 2026-10-27
 
 - Read the mutable stable manifest through GitHub's contents API rather than a potentially stale raw-content response. Immutable application downloads remain hash-verified.

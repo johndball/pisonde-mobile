@@ -2,7 +2,7 @@
 
 A Raspberry Pi field receiver for amateur balloon and weather-sonde recovery: sequential SDR scanning, a simple phone dashboard, and durable local coordinates when recovery has to wait.
 
-**Application: 0.3.13 · Stable-channel application updates**
+**Application: 0.3.14 · Stable-channel application updates**
 
 > The receiver has been exercised on the original field Pi. The generalized fresh-install workflow has passed offline tests but still needs an end-to-end test on a fresh Raspberry Pi OS card. Keep a known-working card intact.
 
@@ -77,13 +77,13 @@ Read [CHANGELOG.md](CHANGELOG.md) for the version history and [GitHub Releases](
 
 ## Background updates
 
-Version 0.3.13 includes an Updates page with an automatic-install checkbox, manual checks and installation controls. Checks run every six hours; automatic installation is limited to 03:00–05:00 local time. Updates use a curated stable manifest pinned to immutable source commits, preserve local configuration/history and attempt rollback on failure.
+Version 0.3.14 includes three independent automatic-install options: a selectable two-hour maintenance window in 24-hour local time, installation at the next reboot after a missed window, and immediate installation when a new version is detected. Checks run about every six hours. Defaults preserve scheduled 0300–0500 installation; the other options start off. Manual checks and installation remain available. Updates use a curated stable manifest pinned to immutable source commits, preserve local configuration/history and attempt rollback on failure.
 
 For an existing device, follow the [one-time updater setup](UPDATES.md). New installations configure update support during initial hardware setup. Application updates do not install OS/dependency changes or database migrations.
 
 ## Tests and field checks
 
-The public baseline passed **135 offline regression tests**. With dependencies installed, run from the repository:
+The public baseline passed **150 offline regression tests**. With dependencies installed, run from the repository:
 
 ```sh
 /opt/pisonde-mobile/venv/bin/python run_tests.py

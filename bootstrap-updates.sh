@@ -20,7 +20,7 @@ def fetch(url,limit):
 entry=json.loads(fetch(api+'contents/updates/stable.json?ref=main&setup='+str(time.time_ns()),131072))
 if entry.get('encoding')!='base64' or entry.get('path')!='updates/stable.json':raise SystemExit('Invalid channel API response')
 manifest=json.loads(base64.b64decode(entry['content']))
-if not re.fullmatch(r'\d+\.\d+\.\d+',str(manifest.get('version',''))) or tuple(map(int,manifest['version'].split('.')))<(0,3,13):raise SystemExit('Stable update publication is incomplete; retry shortly')
+if not re.fullmatch(r'\d+\.\d+\.\d+',str(manifest.get('version',''))) or tuple(map(int,manifest['version'].split('.')))<(0,3,14):raise SystemExit('Stable update publication is incomplete; retry shortly')
 commit=manifest.get('commit','');digest=manifest.get('files',{}).get('update_manager.py','')
 if manifest.get('schema')!=1 or manifest.get('compatibility')!='app-only-v1' or not re.fullmatch('[0-9a-f]{40}',commit) or not re.fullmatch('[0-9a-f]{64}',digest):raise SystemExit('Invalid stable manifest')
 source=fetch(base+commit+'/update_manager.py',262144)

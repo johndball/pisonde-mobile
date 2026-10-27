@@ -22,6 +22,7 @@ ALLOWED={
     'release-notes/v0.3.11.md',
     'release-notes/v0.3.12.md',
     'release-notes/v0.3.13.md',
+    'release-notes/v0.3.14.md',
     'test_publish_releases.py',
 
     'UPDATES.md',

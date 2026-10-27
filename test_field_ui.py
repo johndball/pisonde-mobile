@@ -40,7 +40,7 @@ class GuiTests(unittest.TestCase):
   for path in ['/','/help','/sondehub-approval','/wifi','/history','/uploads','/weather-validation.jsonl?type=RS41','/upload-report.json']:
    self.assertEqual(self.client.get(path).status_code,200,path)
   self.assertEqual(self.client.post('/api/control',json={'profile':'STOP'}).status_code,403)
-  page=self.client.get('/').text;self.assertIn('v0.3.13',page);self.assertIn('id="upload-status"',page);self.assertNotIn('Auto: resume searching',page)
+  page=self.client.get('/').text;self.assertIn('v0.3.14',page);self.assertIn('id="upload-status"',page);self.assertNotIn('Auto: resume searching',page)
  def test_status_reads_do_not_touch_stored_history(self):
   self.add();before=self.m.DB.read_bytes();self.status();self.status()
   with self.m.database() as db:self.assertEqual(db.execute('SELECT COUNT(*) FROM receptions').fetchone()[0],1)
@@ -48,12 +48,32 @@ class GuiTests(unittest.TestCase):
 
  def test_update_controls_and_csrf(self):
   self.assertEqual(self.client.get('/updates').status_code,200)
-  self.assertIn('Automatic updates',self.client.get('/updates').text)
+  self.assertIn('Automatic installation',self.client.get('/updates').text)
   self.assertIn('href="/updates"',self.client.get('/').text)
   self.assertEqual(self.client.post('/api/updates',json={'operation':'install'}).status_code,403)
   with self.client.session_transaction() as session:token=session['token']
-  with patch.object(self.f,'broker',return_value={'automatic':False,'installed_version':'0.3.13'}) as broker:
+  with patch.object(self.f,'broker',return_value={'automatic':False,'installed_version':'0.3.14'}) as broker:
    response=self.client.post('/api/updates',json={'operation':'set_auto','enabled':False},headers={'X-CSRF-Token':token})
    self.assertEqual(response.status_code,200);broker.assert_called_once_with('update',operation='set_auto',enabled=False)
 
+ def test_update_policy_api_and_controls(self):
+  page=self.client.get('/updates').text
+  for ident in ('scheduled','reboot_if_missed','immediate','window','save-policy'):
+   self.assertIn('id="'+ident+'"',page)
+  self.assertNotIn('3 and 5 a.m.',page)
+  with self.client.session_transaction() as session:token=session['token']
+  cfg=dict(scheduled=True,reboot_if_missed=True,immediate=False,window_start=5,window_end=7)
+  with patch.object(self.f,'broker',return_value=cfg) as broker:
+   response=self.client.post('/api/updates',json={'operation':'set_policy','settings':cfg},headers={'X-CSRF-Token':token})
+   self.assertEqual(response.status_code,200);broker.assert_called_once_with('update',operation='set_policy',settings=cfg)
+  self.assertEqual(self.client.post('/api/updates',json={'operation':'set_policy','settings':cfg}).status_code,403)
+
+ def test_updates_javascript_parses(self):
+  import re,subprocess,shutil
+  if not shutil.which('node'):self.skipTest('Node is unavailable')
+  for script in re.findall(r'<script>(.*?)</script>',self.client.get('/updates').text,re.S):
+   result=subprocess.run(['node','--check'],input=script,text=True,capture_output=True)
+   self.assertEqual(result.returncode,0,result.stderr)
+
 if __name__=='__main__':unittest.main()
+

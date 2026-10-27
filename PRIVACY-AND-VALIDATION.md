@@ -1,6 +1,6 @@
 # Public-release privacy and validation notes
 
-Package: **0.3.13**, prepared 27 October 2026.
+Package: **0.3.14**, prepared 27 October 2026.
 
 ## Privacy changes
 
