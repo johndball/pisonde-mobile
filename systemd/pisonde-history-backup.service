@@ -1,0 +1,16 @@
+[Unit]
+Description=PiSonde checked reception-history backup
+After=pisonde-mobile.service
+
+[Service]
+Type=oneshot
+User=pisonde-mobile
+Group=pisonde-mobile
+ExecStart=/usr/bin/python3 /opt/pisonde-mobile/storage_maintenance.py
+Nice=15
+IOSchedulingClass=idle
+ProtectSystem=full
+ProtectHome=true
+PrivateTmp=true
+NoNewPrivileges=true
+UMask=0077

@@ -1,0 +1,32 @@
+[Unit]
+Description=PiSonde Mobile automatic discovery and webpage
+After=network.target pisonde-wifi-control.service
+Wants=pisonde-wifi-control.service
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+User=pisonde-mobile
+Group=pisonde-mobile
+SupplementaryGroups=plugdev
+WorkingDirectory=/var/lib/pisonde-mobile
+RuntimeDirectory=pisonde-mobile
+RuntimeDirectoryMode=0750
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/opt/pisonde-mobile/venv/bin/python /opt/pisonde-mobile/mobile.py
+Restart=always
+RestartSec=5
+WatchdogSec=90
+LimitCORE=0
+TimeoutStopSec=20
+KillMode=control-group
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

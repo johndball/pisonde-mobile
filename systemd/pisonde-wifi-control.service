@@ -1,0 +1,24 @@
+[Unit]
+Description=PiSonde onboard access point and USB upstream control
+After=NetworkManager.service
+Requires=NetworkManager.service
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+User=root
+Group=pisonde-mobile
+RuntimeDirectory=pisonde-control
+RuntimeDirectoryMode=0750
+ExecStart=/usr/bin/python3 /opt/pisonde-mobile/wifi_control.py
+Restart=always
+RestartSec=5
+TimeoutStopSec=10
+NoNewPrivileges=true
+ProtectSystem=full
+ProtectHome=true
+PrivateTmp=true
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,35 @@
+{
+  "repository": "https://github.com/osmocom/rtl-sdr",
+  "files": [
+    {
+      "path": "rtl_power.c",
+      "sha": "f78561fb80d61aaf680510954d47479cd54d7455",
+      "url": "https://github.com/osmocom/rtl-sdr/blob/master/src/rtl_power.c"
+    },
+    {
+      "path": "convenience.c",
+      "sha": "00cc2cc3f5d6f9db9c671c233678e6df73708f81",
+      "url": "https://github.com/osmocom/rtl-sdr/blob/master/src/convenience/convenience.c"
+    },
+    {
+      "path": "convenience.h",
+      "sha": "1faa2aff89b48e674b2378b9c0c25339749b7071",
+      "url": "https://github.com/osmocom/rtl-sdr/blob/master/src/convenience/convenience.h"
+    },
+    {
+      "path": "rtl-sdr.h",
+      "sha": "d64701ea2ebc181e065c36887e05cf45d6391a19",
+      "url": "https://github.com/osmocom/rtl-sdr/blob/master/include/rtl-sdr.h"
+    },
+    {
+      "path": "COPYING",
+      "sha": "d511905c1647a1e311e8b20d5930a37a9c2531cd",
+      "url": "https://github.com/osmocom/rtl-sdr/blob/master/COPYING"
+    }
+  ],
+  "changes": [
+    "rtl_power.c MAXIMUM_RATE changed from 2800000 to 2000000",
+    "Added --pisonde-plan offline diagnostic using production frequency_range",
+    "Reject out-of-range calculated sample rates before USB open"
+  ]
+}

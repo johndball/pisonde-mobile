@@ -1,0 +1,11 @@
+[Unit]
+Description=Daily checked PiSonde reception-history backup
+
+[Timer]
+OnCalendar=daily
+OnBootSec=10min
+Persistent=true
+RandomizedDelaySec=2min
+
+[Install]
+WantedBy=timers.target

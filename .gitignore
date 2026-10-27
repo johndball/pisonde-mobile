@@ -1,0 +1,42 @@
+# Python/build artifacts
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+build/
+dist/
+
+# Installation-local identities, credentials, telemetry and recordings
+hardware.json
+scanner.json
+uploads.json
+setup-state.json
+forgotten-networks.json
+.env
+.env.*
+*.nmconnection
+*.key
+*.pem
+*.sqlite*
+*.db
+*.db-*
+*.jsonl
+*.csv
+*.gpx
+*.log
+*.wav
+*.pcm
+*.iq
+*.bin
+private/
+backups/
+logs/
+upload/
+output/
+
+# Downloaded upstream repositories and runtime inventory
+horusdemodlib/
+radiosonde_auto_rx/
+installed-python-versions.txt
+
