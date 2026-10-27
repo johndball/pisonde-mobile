@@ -37,6 +37,9 @@ ALLOWED={
     'fresh_install.py',
     'test_fresh_install.py',
     'release-notes/v0.3.16.md',
+    'release-notes/v0.3.17.md',
+    'updates/candidates/0.3.17.json',
+    'updates/releases/0.3.17.json',
     'updates/candidates/0.3.16.json',
     'updates/releases/0.3.15.json',
     'updates/releases/0.3.16.json',
@@ -78,6 +81,7 @@ ALLOWED={
     'systemd/pisonde-wifi-control.service',
     'test_field_features.py',
     'test_field_ui.py',
+    'test_field_controls.py',
     'test_public_setup.py',
     'test_release_contents.py',
     'test_scanner.py',
@@ -96,4 +100,4 @@ class ReleaseContentsTests(unittest.TestCase):
             relative=path.relative_to(ROOT)
             if any(part in excluded for part in relative.parts):continue
             if path.is_file():actual.add(relative.as_posix())
-        self.assertEqual(actual-{'updates/stable.json','updates/candidates/0.3.15.json','updates/candidates/0.3.16.json','updates/releases/0.3.15.json','updates/releases/0.3.16.json'},ALLOWED-{'updates/stable.json','updates/candidates/0.3.15.json','updates/candidates/0.3.16.json','updates/releases/0.3.15.json','updates/releases/0.3.16.json'},'Review unexpected files before creating a software release')
+        self.assertEqual(actual-{'updates/stable.json','updates/candidates/0.3.15.json','updates/candidates/0.3.16.json','updates/releases/0.3.15.json','updates/releases/0.3.16.json','updates/candidates/0.3.17.json','updates/releases/0.3.17.json'},ALLOWED-{'updates/stable.json','updates/candidates/0.3.15.json','updates/candidates/0.3.16.json','updates/releases/0.3.15.json','updates/releases/0.3.16.json','updates/candidates/0.3.17.json','updates/releases/0.3.17.json'},'Review unexpected files before creating a software release')

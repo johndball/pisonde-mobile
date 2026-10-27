@@ -12,11 +12,12 @@ HARDWARE=Path('/etc/pisonde-mobile/hardware.json')
 RAW='https://raw.githubusercontent.com/johndball/pisonde-mobile/'
 API='https://api.github.com/repos/johndball/pisonde-mobile/'
 CHANNEL=API+'contents/updates/signed-stable.json?ref=main'
-UPDATER_VERSION='0.3.16'
+UPDATER_VERSION='0.3.17'
 FILES={'mobile.py','field_features.py','field_ui.py','wifi_control.py','sdr_health.py','hardware.py','storage_maintenance.py','verify_recovery.py','update_manager.py','update_ui.py'}
 TRUST=Path('/etc/pisonde-mobile/update-signing-public.pem')
 ENROLL_FINGERPRINT='34e43261378f0235107cc0d1e3eb8d2bed7d44c44d995323d7646203235dbfd0'
 DOMAIN=b'PiSonde-Mobile signed-stable manifest v1\n'
+POWER_PENDING=Path('/run/pisonde-control/power-pending.json')
 UNITS=('pisonde-wifi-control.service','pisonde-mobile.service')
 DEFAULT={'scheduled':True,'reboot_if_missed':False,'immediate':False,'window_start':3,'window_end':5}
 WINDOWS=tuple((start,(start+2)%24) for start in range(1,24,2))
@@ -295,6 +296,12 @@ def recover_running():
     if (STATE/'pending.json').exists():
         services('stop');recover();services('start')
 
+def power_pending():
+    try:
+        value=read(POWER_PENDING,{})
+        return 0<=time.time()-value.get('queued_epoch',0)<90
+    except Exception:return True  # A malformed power marker is not permission to update.
+
 def run(action):
     if action not in ('run','check','install'):raise RuntimeError('Unsupported update operation')
     try:command(['systemctl','start','pisonde-update-recover.service'])
@@ -304,6 +311,7 @@ def run(action):
             update_status(phase='Update worker failed to start',outcome='failed',completed_at=now(),last_error=str(exc)[:300])
         raise
     with locked():
+        if power_pending():raise RuntimeError('Device restart/shutdown is pending')
         current=read(STATE/'status.json',{})
         ident=current.get('operation_id') if current.get('phase')=='Queued' and current.get('operation')==action else uuid.uuid4().hex
         update_status(operation_id=ident,operation=action,started_at=now(),completed_at=None,outcome=None,phase='Checking',last_error='',last_result='')
@@ -361,6 +369,7 @@ def broker_action(value):
             command(['systemctl','start','--no-block','pisonde-update-run.service'])
         return status()
     if action not in ('check','install'):raise RuntimeError('Unsupported update control')
+    if power_pending():raise RuntimeError('Device restart/shutdown is pending')
     if not (STATE/'settings.json').exists():raise RuntimeError('Run the one-time updater setup first')
     ident=uuid.uuid4().hex
     with locked():

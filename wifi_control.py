@@ -103,8 +103,25 @@ def ensure():
         nm('connection','up',AP,timeout=18)
     return status()
 
+def power_action(value):
+    if set(value)!={'action','operation'} or value.get('operation') not in ('restart','shutdown'):
+        raise RuntimeError('Power control accepts only restart or shutdown')
+    if os.geteuid()!=0:raise RuntimeError('Power control requires the root broker')
+    import update_manager as u
+    with u.locked():
+        if u.power_pending():raise RuntimeError('A device power action is already pending')
+        if (u.STATE/'pending.json').exists():raise RuntimeError('Recover the interrupted update before restarting/shutting down')
+        state=u.status()
+        if state.get('phase')=='Queued' and not state.get('completed_at'):raise RuntimeError('An update is queued; wait for it to finish')
+        operation=value['operation'];target='reboot' if operation=='restart' else 'poweroff'
+        unit='pisonde-power-'+uuid.uuid4().hex
+        u.command(['/usr/bin/systemd-run','--unit='+unit,'--on-active=5s','--collect','/usr/bin/systemctl',target])
+        u.put(u.POWER_PENDING,dict(operation=operation,queued_epoch=time.time()))
+    return dict(queued=operation,delay_seconds=5)
+
 def handle(value):
     action=value.get('action')
+    if action=='power':return power_action(value)
     if action=='update':
         from update_manager import broker_action
         return broker_action(value)

@@ -1,6 +1,6 @@
 # Public-release privacy and validation notes
 
-Package: **0.3.16**, prepared 27 October 2026.
+Package: **0.3.17**, prepared 27 October 2026.
 
 ## Privacy changes
 
@@ -27,3 +27,5 @@ The existing 0.3.10 receiver code has been exercised on the original field Pi. T
 An intermittent SDR stall was mitigated by detection/recovery; its hardware cause has not been conclusively identified. This package does not promise arbitrary power-loss safety. SondeHub weather uploader approval remains external and uncompleted. APRS-IS socket writes do not establish downstream map ingestion.
 
 The release-signing public key and its fingerprint are intentionally public. Private signing keys/passwords are never included. Signed-channel publication requires a publisher signature; device enrollment and RF validation remain device-side checks.
+
+Retention remains disabled by default. Enabled cleanup deletes eligible active database receptions and linked upload/validation payloads; it does not securely erase SD blocks or purge existing backups, notes or diagnostic logs. Power controls use the existing local-dashboard/CSRF model and a narrow root broker. Keep the dashboard on a trusted network.

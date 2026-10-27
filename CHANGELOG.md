@@ -2,6 +2,16 @@
 
 Application versions, stable-channel deployments and GitHub Releases are related but distinct. An enrolled device installs only the immutable source snapshot authenticated by `updates/signed-stable.json` (legacy devices use `updates/stable.json`); publishing a tag alone does not deploy code. GitHub Releases are available from the repository's Releases page.
 
+## 0.3.17 — 2026-10-27, signed publication pending
+
+- Add Uploads retention controls: keep forever (default), 30/60/90/180/365 days, or oldest-first cleanup below 5/10/15/20% free space (10% default).
+- Require confirmation before enabling deletion; optionally protect each target's latest position and the latest reception of noted/recovery-marked targets (enabled by default). Always retain the highest reception ID; low-space cleanup also protects the newest five minutes.
+- Delete eligible receptions and linked upload/validation payloads in bounded transactions. Roll back interrupted transactions, update counts and invalidate deleted dashboard caches. Preserve notes and existing backups/logs.
+- Evaluate policy at startup, every five minutes and after saving. Low-space compaction is bounded and requires working space; report limitations instead of deleting unrelated files. Age-mode freed pages are reused by SQLite.
+- Add confirmed Restart Pi and Shut down Pi controls on dashboard pages. A fixed root-broker action schedules reboot/poweroff after five seconds; reject update/power conflicts and duplicate actions.
+- Add accessible blue navigation/actions, green saves/resume, amber locks/restart and red shutdown controls while retaining the simple mobile layout.
+- Pass 218 offline tests, including real SQLite cleanup/compaction, rollback, protected history, API/CSRF guards, mocked power operations and JavaScript interaction simulation. Device/browser field validation remains separate.
+
 ## 0.3.16 — 2026-10-27
 
 - Integrate signed manifest verification and public-key enrollment into fresh installation. New users complete normal install/hardware setup without a separate enrollment command.
