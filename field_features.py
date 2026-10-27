@@ -544,6 +544,7 @@ def install(module,start_threads=True):
     M.app.add_url_rule('/weather-validation.jsonl','field_weather_validation',weather_validation)
     M.app.add_url_rule('/upload-report.json','field_upload_report',upload_report)
     M.app.add_url_rule('/api/retention','field_retention',retention_api,methods=['GET','POST'])
+    M.app.add_url_rule('/device','field_device',device_page)
     M.app.add_url_rule('/api/power','field_power',power_api,methods=['POST'])
     M.app.add_url_rule('/api/uploads','field_uploads_api',upload_settings,methods=['POST'])
     M.app.add_url_rule('/api/upload-test','field_test',development_upload_test,methods=['POST'])
@@ -567,12 +568,16 @@ POWER_UI='<details class="device-controls"><summary>Device controls</summary><p>
 BASE='''<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><title>PiSonde Mobile</title><style>
 body{font:18px system-ui;margin:16px;max-width:850px}input,button,select,textarea{font:inherit;padding:10px;margin:5px 0;max-width:100%;box-sizing:border-box}input,select,textarea{width:100%}article{border-top:1px solid #aaa;padding:12px 0}small{overflow-wrap:anywhere}a{display:inline-block;padding:6px 0}.error{color:#a00}</style></head><body><a href="/">← Receiver</a> CONTENT </body></html>'''
 
+def device_page():
+    controls=POWER_UI.replace('<details class="device-controls"><summary>Device controls</summary>','<section class="device-controls">').replace('</details>','</section>')
+    return page('<h2>Device controls</h2>'+controls)
+
 def navigation():
-    links=(('/','Receiver'),('/wifi','Wi-Fi'),('/history','History'),('/uploads','Uploads'),('/updates','Updates'),('/help','Help'))
+    links=(('/','Receiver'),('/wifi','Wi-Fi'),('/history','History'),('/uploads','Uploads'),('/updates','Updates'),('/device','Device controls'),('/help','Help'))
     return '<nav aria-label="Main">'+''.join('<a href="'+url+'"'+(' aria-current="page"' if request.path==url else '')+'>'+label+'</a>' for url,label in links)+'</nav>'
 
 def page(content,**data):
-    template=BASE.replace('<a href="/">← Receiver</a>',navigation()).replace('</style>',THEME+'</style>').replace('CONTENT',content+POWER_UI)
+    template=BASE.replace('<a href="/">← Receiver</a>',navigation()).replace('</style>',THEME+'</style>').replace('CONTENT',content)
     return render_template_string(template,token=token(),**data)
 
 

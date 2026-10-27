@@ -2,6 +2,12 @@
 
 Application versions, stable-channel deployments and GitHub Releases are related but distinct. An enrolled device installs only the immutable source snapshot authenticated by `updates/signed-stable.json` (legacy devices use `updates/stable.json`); publishing a tag alone does not deploy code. GitHub Releases are available from the repository's Releases page.
 
+## 0.3.18 — 2026-10-27, signed publication pending
+
+- Move restart/shutdown controls to their own `/device` page. Add Device controls between Updates and Help in the main navigation and shared page menus.
+- Remove inline power controls from Uploads and other pages; retain Uploads retention settings and existing power confirmations/interlocks.
+- Update existing route/navigation/JavaScript checks. All 218 offline checks pass.
+
 ## 0.3.17 — 2026-10-27
 
 - Add Uploads retention controls: keep forever (default), 30/60/90/180/365 days, or oldest-first cleanup below 5/10/15/20% free space (10% default).

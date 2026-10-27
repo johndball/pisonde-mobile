@@ -32,7 +32,7 @@ from flask import Flask, Response, abort, jsonify, render_template_string, reque
 from waitress import serve
 from sdr_health import FlowMonitor, FreshnessMonitor, RadioFailure, Recovery, request_reset
 
-VERSION = '0.3.17'
+VERSION = '0.3.18'
 ROOT = Path(os.environ.get('PISONDE_DATA', '/var/lib/pisonde-mobile'))
 APPROOT = Path(os.environ.get('PISONDE_APPROOT', '/opt/pisonde-mobile'))
 RUNTIME = Path(os.environ.get('PISONDE_RUNTIME', '/run/pisonde-mobile'))

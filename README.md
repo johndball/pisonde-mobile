@@ -2,7 +2,7 @@
 
 A Raspberry Pi field receiver for amateur balloon and weather-sonde recovery: sequential SDR scanning, a simple phone dashboard, and durable local coordinates when recovery has to wait.
 
-**Application: 0.3.17 · Signed application updates**
+**Application: 0.3.18 · Signed application updates**
 
 Fresh installs of 0.3.16 automatically verify the signed release and enroll its public key during setup. Existing enrolled devices update through the GUI. Older unenrolled devices still need one-time [signed-update enrollment](SIGNED-UPDATES.md). Source commits alone do not deploy updates; publisher signature and signed-channel publication are required.
 
@@ -15,7 +15,7 @@ Fresh installs of 0.3.16 automatically verify the signed release and enroll its 
 - Automatically holds after valid packets; offers manual frequency lock and scan resume.
 - Displays payload coordinates in decimal degrees and DMS, with map links and copy controls.
 - Stores decoded receptions locally, with recovery notes, CSV/GPX exports and checked rotating database backups. Retention defaults to forever; optional day/low-space policies are under Uploads.
-- Provides confirmed Pi restart/shutdown controls and a simple color-coded navigation/action theme.
+- Provides confirmed Pi restart/shutdown controls on a dedicated Device controls page and a simple color-coded navigation/action theme.
 - Detects stalled or exactly repeating SDR samples, restarts the pipeline and permits bounded resets of the configured SDR.
 - Keeps onboard Wi-Fi dedicated to the local access point while USB Wi-Fi connects to upstream hotspots.
 
@@ -80,7 +80,7 @@ Read [CHANGELOG.md](CHANGELOG.md) for the version history and [GitHub Releases](
 
 ## Background updates
 
-Version 0.3.17 retains three independent automatic-install options: a selectable two-hour maintenance window in 24-hour local time, installation at the next reboot after a missed window, and immediate installation when a new version is detected. Checks run about every six hours. Defaults preserve scheduled 0300–0500 installation; the other options start off. Manual checks and installation remain available. Updates use a curated stable manifest pinned to immutable source commits, preserve local configuration/history and attempt rollback on failure.
+Version 0.3.18 retains three independent automatic-install options: a selectable two-hour maintenance window in 24-hour local time, installation at the next reboot after a missed window, and immediate installation when a new version is detected. Checks run about every six hours. Defaults preserve scheduled 0300–0500 installation; the other options start off. Manual checks and installation remain available. Updates use a curated stable manifest pinned to immutable source commits, preserve local configuration/history and attempt rollback on failure.
 
 For an existing device, follow the [one-time updater setup](UPDATES.md). New installations configure update support during initial hardware setup. Application updates do not install OS/dependency changes or database migrations.
 

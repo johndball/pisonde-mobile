@@ -114,17 +114,21 @@ class RetentionTests(unittest.TestCase):
             r=self.client.post('/api/power',headers=self.headers,json={'operation':'restart'});self.assertEqual(r.status_code,200);broker.assert_called_once_with('power',operation='restart')
             self.assertEqual(self.client.post('/api/power',headers=self.headers,json={'operation':'shutdown','command':'anything'}).status_code,400)
             self.assertEqual(broker.call_count,1)
-    def test_theme_and_device_controls_on_all_pages(self):
+    def test_theme_navigation_and_dedicated_device_page(self):
         for path in ('/','/uploads','/wifi','/history','/updates','/help'):
             page=self.client.get(path).text
-            self.assertIn('data-power="restart"',page);self.assertIn('data-power="shutdown"',page);self.assertIn('--blue:#155eab',page)
+            self.assertNotIn('data-power="restart"',page);self.assertNotIn('data-power="shutdown"',page);self.assertIn('--blue:#155eab',page);self.assertIn('href="/device"',page)
+        device=self.client.get('/device').text
+        self.assertIn('data-power="restart"',device);self.assertIn('data-power="shutdown"',device);self.assertIn('aria-current="page">Device controls',device)
+        home=self.client.get('/').text
+        self.assertLess(home.index('href="/updates"'),home.index('href="/device"'));self.assertLess(home.index('href="/device"'),home.index('href="/help"'))
         uploads=self.client.get('/uploads').text
         for value in ('30 days','60 days','90 days','180 days','365 days','10%','Protect latest location'):self.assertIn(value,uploads)
 
     def test_browser_scripts_keep_edits_and_confirm_power(self):
         import json,re,shutil,subprocess
         if not shutil.which('node'):self.skipTest('Node unavailable')
-        page=self.client.get('/uploads').text;scripts=re.findall(r'<script>(.*?)</script>',page,re.S)
+        page=self.client.get('/uploads').text+self.client.get('/device').text;scripts=re.findall(r'<script>(.*?)</script>',page,re.S)
         javascript=r'''
 const vm=require('node:vm'),assert=require('node:assert/strict');
 const input=JSON.parse(require('node:fs').readFileSync(0,'utf8')),elements={},requests=[];
