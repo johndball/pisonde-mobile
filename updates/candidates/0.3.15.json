@@ -1,0 +1,18 @@
+{
+  "schema": 2,
+  "compatibility": "app-only-v1",
+  "version": "0.3.15",
+  "commit": "a82f4e88b8f9d7a70c8dcc61ac483f837f4905b6",
+  "files": {
+    "field_features.py": "fe4502a0333c6ef3d5425b009bf4f7ac122e96bd23e21296e4ddcf42d03365d2",
+    "field_ui.py": "cc0d1be4ae96e947e82ef5c053413b3f086e63665e30de29be7d8e959768f33e",
+    "hardware.py": "a36d90e32e93e20aeb6a0db245b0dfc4b3619da535f3e61aee360627262274de",
+    "mobile.py": "d00e7e97e26fe58d86d1c7118e57a5b47edafa850af3d585c995cf179f347f41",
+    "sdr_health.py": "220239f33a6441b63572e00054bc1fe8369d32b63687396297d4bd5ca99ffc07",
+    "storage_maintenance.py": "2dc51f72f7506fc8902c657d0f44a83a4129669092af6a9455147ea781253fa5",
+    "update_manager.py": "b74df476b684deb3ed194bd1dfc1380d2a117cdd7ba4a6ec71bef972fe04b0bf",
+    "update_ui.py": "a4e38d0e9caad3adcbed092fe1cc5ecc2dce41ec5379e0e54b6ca6c9fa0e66f1",
+    "verify_recovery.py": "cd7cc4f0ea0fdac1bfb59b2a5ff8cc869a15c33b0075b316371a20a62b6449fc",
+    "wifi_control.py": "de36dab792c4f6d56520ef250e44ac13593091ca9820e3f264c378194b1e4742"
+  }
+}
