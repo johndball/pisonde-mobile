@@ -1,30 +1,30 @@
 {
   "schema": 2,
   "compatibility": "app-only-v1",
-  "version": "0.3.15",
-  "commit": "a82f4e88b8f9d7a70c8dcc61ac483f837f4905b6",
+  "version": "0.3.16",
+  "commit": "71f9c859e98ec8ef13dcf7827b63f7456bc11783",
   "files": {
     "field_features.py": "fe4502a0333c6ef3d5425b009bf4f7ac122e96bd23e21296e4ddcf42d03365d2",
     "field_ui.py": "cc0d1be4ae96e947e82ef5c053413b3f086e63665e30de29be7d8e959768f33e",
     "hardware.py": "a36d90e32e93e20aeb6a0db245b0dfc4b3619da535f3e61aee360627262274de",
-    "mobile.py": "d00e7e97e26fe58d86d1c7118e57a5b47edafa850af3d585c995cf179f347f41",
+    "mobile.py": "cd7753225dff193dac2d550d0de8216253923a60d6de162980033ba7a42fc86c",
     "sdr_health.py": "220239f33a6441b63572e00054bc1fe8369d32b63687396297d4bd5ca99ffc07",
     "storage_maintenance.py": "2dc51f72f7506fc8902c657d0f44a83a4129669092af6a9455147ea781253fa5",
-    "update_manager.py": "b74df476b684deb3ed194bd1dfc1380d2a117cdd7ba4a6ec71bef972fe04b0bf",
+    "update_manager.py": "9041181b915804e782e2205b80b73adcd567039e2397d52da3b88414efbe9fe6",
     "update_ui.py": "a4e38d0e9caad3adcbed092fe1cc5ecc2dce41ec5379e0e54b6ca6c9fa0e66f1",
-    "verify_recovery.py": "cd7cc4f0ea0fdac1bfb59b2a5ff8cc869a15c33b0075b316371a20a62b6449fc",
+    "verify_recovery.py": "42e558c0ad9a97371527a64980a6358d62fab5faf5a8bfbaee86ca31fa3779fb",
     "wifi_control.py": "de36dab792c4f6d56520ef250e44ac13593091ca9820e3f264c378194b1e4742"
   },
   "security": {
     "repository": "johndball/pisonde-mobile",
     "channel": "signed-stable",
-    "sequence": 1,
-    "issued_at": "2026-10-27T17:00:30Z",
-    "expires_at": "2027-01-25T17:00:30Z"
+    "sequence": 2,
+    "issued_at": "2026-10-27T17:20:46Z",
+    "expires_at": "2027-01-25T17:20:46Z"
   },
   "signature": {
     "algorithm": "ed25519",
     "key_id": "34e43261378f0235107cc0d1e3eb8d2bed7d44c44d995323d7646203235dbfd0",
-    "value": "o0BA+Q4+LPj4s6Au9kBhzwUkGn47iAki7i63IQxpjx8KU7EnLdJO+CWd22ppMR7L1VsA8ug4sl33182aOmTzBQ=="
+    "value": "r7Egm4GT9hvjgF52kjxnqxGDWzeqGmwWZ77whuwZ/qKulKrfed/6L3cIosgWsUp3FRgEMZ69N51gzcP/nif1AA=="
   }
 }

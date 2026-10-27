@@ -2,7 +2,7 @@
 
 Application versions, stable-channel deployments and GitHub Releases are related but distinct. An enrolled device installs only the immutable source snapshot authenticated by `updates/signed-stable.json` (legacy devices use `updates/stable.json`); publishing a tag alone does not deploy code. GitHub Releases are available from the repository's Releases page.
 
-## 0.3.16 — 2026-10-27, signed publication pending
+## 0.3.16 — 2026-10-27
 
 - Integrate signed manifest verification and public-key enrollment into fresh installation. New users complete normal install/hardware setup without a separate enrollment command.
 - Explicitly create or normalize the configuration directory as root:root mode 0755, fixing service-owned directory enrollment failures. Preserve ownership of individual existing files and reject symlink directories.
