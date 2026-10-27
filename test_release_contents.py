@@ -37,6 +37,7 @@ ALLOWED={
     'updates/signing-public.pem',
     'release-notes/v0.3.15.md',
     'updates/stable.json',
+    'updates/signed-stable.json',
     'updates/candidates/0.3.15.json',
 
     '.gitattributes',

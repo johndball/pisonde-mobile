@@ -4,7 +4,7 @@ A Raspberry Pi field receiver for amateur balloon and weather-sonde recovery: se
 
 **Application: 0.3.15 · Signed application updates**
 
-Version 0.3.15 requires one-time [signed-update enrollment](SIGNED-UPDATES.md). Older devices remain on the 0.3.14 legacy channel until enrolled. Publishing/installing 0.3.15 is gated on the first valid publisher signature; source commits alone do not deploy it.
+Version 0.3.15 requires one-time [signed-update enrollment](SIGNED-UPDATES.md). Older devices remain on the 0.3.14 legacy channel until enrolled. The first publisher signature has been verified and published; source commits alone do not deploy updates.
 
 > The receiver has been exercised on the original field Pi. The generalized fresh-install workflow has passed offline tests but still needs an end-to-end test on a fresh Raspberry Pi OS card. Keep a known-working card intact.
 
