@@ -107,3 +107,19 @@ The dashboard is local HTTP; keep it on a trusted network and do not expose it d
 
 See [privacy and validation notes](PRIVACY-AND-VALIDATION.md), [source/license notices](NOTICE.md) and [LICENSE](LICENSE). The PiSonde-specific source uses MIT; the separate modified survey source under `rate-survey/` retains its GPL notices and corresponding source.
 
+
+## Screenshots
+
+Actual application screens with **synthetic demo data**, not live telemetry or private network details.
+
+![Receiver dashboard](docs/screenshots/receiver.png)
+
+| Software updates | Wi-Fi hotspots |
+| --- | --- |
+| ![Updates](docs/screenshots/updates.png) | ![Wi-Fi](docs/screenshots/wifi.png) |
+
+| Recovery history | Upload controls |
+| --- | --- |
+| ![History](docs/screenshots/history.png) | ![Uploads](docs/screenshots/uploads.png) |
+
+See the [screenshot gallery](docs/screenshots/README.md) for the field guide and weather-validation page.

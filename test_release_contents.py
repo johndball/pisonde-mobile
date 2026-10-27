@@ -5,6 +5,15 @@ import unittest
 ROOT=Path(__file__).resolve().parent
 # Adding a release file requires an explicit review of this allowlist.
 ALLOWED={
+    'docs/screenshots/README.md',
+    'docs/screenshots/receiver.png',
+    'docs/screenshots/updates.png',
+    'docs/screenshots/wifi.png',
+    'docs/screenshots/history.png',
+    'docs/screenshots/uploads.png',
+    'docs/screenshots/help.png',
+    'docs/screenshots/weather-validation.png',
+
     'CHANGELOG.md',
     '.github/workflows/releases.yml',
     'tools/publish_releases.py',
