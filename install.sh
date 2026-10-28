@@ -72,7 +72,7 @@ install -m 0644 "$SOURCE"/systemd/* /etc/systemd/system/
 systemctl daemon-reload
 "$DEST/venv/bin/python" -m pip freeze > "$DEST/installed-python-versions.txt"
 python3 "$SOURCE/fresh_install.py" enroll "$SOURCE" "$WORK/release.json"
-echo 'Installed signed PiSonde Mobile 0.3.19. Services are not started yet.'
+echo 'Installed signed PiSonde Mobile 0.3.20. Services are not started yet.'
 echo 'Public key enrolled automatically; no separate enrollment command is needed.' 
 echo 'Reboot to release the TV driver, then use Ethernet or a local console:'
 echo 'sudo python3 /opt/pisonde-mobile/configure.py'

@@ -38,6 +38,10 @@
   },
   {
     "tag": "v0.3.19",
+    "commit": "0013bd886fef50fae5a952fcf3b424d052e22a1e"
+  },
+  {
+    "tag": "v0.3.20",
     "commit": "signed-stable"
   }
 ]

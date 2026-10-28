@@ -2,6 +2,15 @@
 
 Application versions, stable-channel deployments and GitHub Releases are related but distinct. An enrolled device installs only the immutable source snapshot authenticated by `updates/signed-stable.json` (legacy devices use `updates/stable.json`); publishing a tag alone does not deploy code. GitHub Releases are available from the repository's Releases page.
 
+## 0.3.20 — pending publisher signature
+
+- Show packet altitude in meters, feet and miles using exact unit conversions without changing stored data or altitude reference.
+- Add independent root-broker Wi-Fi fault monitoring with current-boot journal deduplication, startup grace, adapter-specific recovery and cooldown/hourly limits.
+- Reserve shared supplicant restart for fresh failures on both adapters after isolated attempts; no reboot, driver unload or USB power cycle.
+- Defer recovery during updater/power operations. Display Wi-Fi recovery state/counters and keep an independent AP activation guard.
+- Preserve local weather coordinates/history and existing APRS/Horus uploads. Intermittent SDR/weather stalls and underlying Wi-Fi fault cause remain unresolved; hardware validation is still required.
+- Pass 231 offline regression checks, including altitude precision, journal fault classification/deduplication, recovery limits, update/power deferral and three-stage SDR startup watchdog coverage.
+
 ## 0.3.19 — 2026-10-28
 
 - Remove direct DFM/RS41 uploads to sondehub.org and weather upload payload generation. Keep weather decoding, local coordinates, raw packets, notes, CSV and GPX.

@@ -121,6 +121,18 @@ class HealthTests(unittest.TestCase):
             child=p.processes[0]
         self.assertIsNotNone(child.poll())
 
+    def test_three_stage_weather_style_pipeline_has_startup_watchdog(self):
+        spec=importlib.util.spec_from_file_location('weather_flow_mobile',Path(__file__).with_name('mobile.py'))
+        m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)
+        quiet=[sys.executable,'-u','-c','import time;time.sleep(10)']
+        relay=[sys.executable,'-u','-c','import sys;sys.stdout.buffer.write(sys.stdin.buffer.read())']
+        with m.Pipeline([quiet,relay,relay],monitor_samples=True) as pipeline:
+            pipeline.flow.timeout=.05
+            time.sleep(.08)
+            with self.assertRaises(h.RadioFailure):pipeline.check_flow()
+            children=list(pipeline.processes)
+        self.assertTrue(all(child.poll() is not None for child in children))
+
     def test_exact_repeat_detected_despite_continuing_byte_flow(self):
         import random
         clock=[0.]
@@ -250,7 +262,7 @@ class HealthTests(unittest.TestCase):
         from unittest.mock import mock_open
         spec=importlib.util.spec_from_file_location('field_verifier',Path(__file__).with_name('verify_recovery.py'))
         v=importlib.util.module_from_spec(spec);spec.loader.exec_module(v)
-        baseline={'version':'0.3.19','config':{'profile':'STOP'}}
+        baseline={'version':'0.3.20','config':{'profile':'STOP'}}
         with patch.object(v.sys,'argv',['verify_recovery.py','--field-only']), \
              patch.object(v.os,'geteuid',return_value=0),patch.object(v.socket,'gethostname',return_value='example-pi'), \
              patch.object(v,'open',mock_open(),create=True),patch.object(v.fcntl,'flock'), \

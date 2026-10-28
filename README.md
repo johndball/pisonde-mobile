@@ -2,7 +2,7 @@
 
 A Raspberry Pi field receiver for amateur balloon and weather-sonde recovery: sequential SDR scanning, a simple phone dashboard, and durable local coordinates when recovery has to wait.
 
-**Application: 0.3.19 · Signed application updates**
+**Application: 0.3.20 · Signed application updates**
 
 Fresh installs of 0.3.16 automatically verify the signed release and enroll its public key during setup. Existing enrolled devices update through the GUI. Older unenrolled devices still need one-time [signed-update enrollment](SIGNED-UPDATES.md). Source commits alone do not deploy updates; publisher signature and signed-channel publication are required.
 
@@ -80,7 +80,7 @@ Read [CHANGELOG.md](CHANGELOG.md) for the version history and [GitHub Releases](
 
 ## Background updates
 
-Version 0.3.19 retains three independent automatic-install options: a selectable two-hour maintenance window in 24-hour local time, installation at the next reboot after a missed window, and immediate installation when a new version is detected. Checks run about every six hours. Defaults preserve scheduled 0300–0500 installation; the other options start off. Manual checks and installation remain available. Updates use a curated stable manifest pinned to immutable source commits, preserve local configuration/history and attempt rollback on failure.
+Version 0.3.20 retains three independent automatic-install options: a selectable two-hour maintenance window in 24-hour local time, installation at the next reboot after a missed window, and immediate installation when a new version is detected. Checks run about every six hours. Defaults preserve scheduled 0300–0500 installation; the other options start off. Manual checks and installation remain available. Updates use a curated stable manifest pinned to immutable source commits, preserve local configuration/history and attempt rollback on failure.
 
 For an existing device, follow the [one-time updater setup](UPDATES.md). New installations configure update support during initial hardware setup. Application updates do not install OS/dependency changes or database migrations.
 
@@ -126,3 +126,7 @@ Actual application screens with **synthetic demo data**, not live telemetry or p
 | ![History](docs/screenshots/history.png) | ![Uploads](docs/screenshots/uploads.png) |
 
 See the [screenshot gallery](docs/screenshots/README.md) for the Device controls page and offline field guide.
+
+## Wi-Fi recovery (0.3.20)
+
+The root broker checks recent current-boot driver/control errors every 30 seconds, independently of the receiver app. It ignores ordinary coverage loss and idle APs. Three relevant journal entries within 120 seconds qualify; repeated entries are deduplicated. Startup grace is 90 seconds. Isolated adapter recovery has a five-minute cooldown and three-attempt hourly cap per adapter. Only fresh errors on both adapters after isolated recovery permit a shared supplicant restart (15-minute cooldown, twice per hour), which briefly affects both Wi-Fi paths. No automatic Pi reboot, USB power cycle or driver unload is added. Update and power operations defer recovery. Wi-Fi displays attempt counters and fixed diagnostic reasons; counters/limits reset with the broker process. AP activation is checked independently of the receiver. These mitigations do not establish or fix the underlying driver fault; verify on hardware. An active AP profile still does not prove a phone can associate or obtain DHCP.

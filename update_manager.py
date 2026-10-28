@@ -12,7 +12,7 @@ HARDWARE=Path('/etc/pisonde-mobile/hardware.json')
 RAW='https://raw.githubusercontent.com/johndball/pisonde-mobile/'
 API='https://api.github.com/repos/johndball/pisonde-mobile/'
 CHANNEL=API+'contents/updates/signed-stable.json?ref=main'
-UPDATER_VERSION='0.3.19'
+UPDATER_VERSION='0.3.20'
 FILES={'mobile.py','field_features.py','field_ui.py','wifi_control.py','sdr_health.py','hardware.py','storage_maintenance.py','verify_recovery.py','update_manager.py','update_ui.py'}
 TRUST=Path('/etc/pisonde-mobile/update-signing-public.pem')
 ENROLL_FINGERPRINT='34e43261378f0235107cc0d1e3eb8d2bed7d44c44d995323d7646203235dbfd0'

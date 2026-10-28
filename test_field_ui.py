@@ -38,7 +38,7 @@ class GuiTests(unittest.TestCase):
   for path in ['/','/help','/sondehub-approval','/wifi','/history','/uploads','/weather-validation.jsonl?type=RS41','/upload-report.json']:
    self.assertEqual(self.client.get(path).status_code,200,path)
   self.assertEqual(self.client.post('/api/control',json={'profile':'STOP'}).status_code,403)
-  page=self.client.get('/').text;self.assertIn('v0.3.19',page);self.assertIn('id="upload-status"',page);self.assertNotIn('Auto: resume searching',page)
+  page=self.client.get('/').text;self.assertIn('v0.3.20',page);self.assertIn('id="upload-status"',page);self.assertNotIn('Auto: resume searching',page)
  def test_status_reads_do_not_touch_stored_history(self):
   self.add();before=self.m.DB.read_bytes();self.status();self.status()
   with self.m.database() as db:self.assertEqual(db.execute('SELECT COUNT(*) FROM receptions').fetchone()[0],1)
@@ -50,7 +50,7 @@ class GuiTests(unittest.TestCase):
   self.assertIn('href="/updates"',self.client.get('/').text)
   self.assertEqual(self.client.post('/api/updates',json={'operation':'install'}).status_code,403)
   with self.client.session_transaction() as session:token=session['token']
-  with patch.object(self.f,'broker',return_value={'automatic':False,'installed_version':'0.3.19'}) as broker:
+  with patch.object(self.f,'broker',return_value={'automatic':False,'installed_version':'0.3.20'}) as broker:
    response=self.client.post('/api/updates',json={'operation':'set_auto','enabled':False},headers={'X-CSRF-Token':token})
    self.assertEqual(response.status_code,200);broker.assert_called_once_with('update',operation='set_auto',enabled=False)
 
@@ -72,6 +72,19 @@ class GuiTests(unittest.TestCase):
   for script in re.findall(r'<script>(.*?)</script>',self.client.get('/updates').text,re.S):
    result=subprocess.run(['node','--check'],input=script,text=True,capture_output=True)
    self.assertEqual(result.returncode,0,result.stderr)
+
+ def test_altitude_units_keep_packet_reference_and_numeric_precision(self):
+  import re,subprocess,shutil
+  if not shutil.which('node'):self.skipTest('Node unavailable')
+  page=self.client.get('/').text
+  function=re.search(r'function altitudeText\(m\)\{.*?\}',page).group()
+  result=subprocess.run(['node','-e',function+';console.log(JSON.stringify([altitudeText(26174.6),altitudeText(0),altitudeText(-10)]))'],capture_output=True,text=True,check=True)
+  values=json.loads(result.stdout)
+  self.assertEqual(values[0],'26174.6 m · 85874.7 ft · 16.26 mi')
+  self.assertEqual(values[1],'0.0 m · 0.0 ft · 0.00 mi')
+  self.assertTrue(values[2].startswith('-10.0 m · -32.8 ft'))
+  self.assertIn('Altitude reported by packet:',page)
+  self.assertIn('altitudeText(p.altitude_m)',page)
 
 if __name__=='__main__':unittest.main()
 

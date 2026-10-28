@@ -1,6 +1,6 @@
 # Public-release privacy and validation notes
 
-Package: **0.3.19**, prepared 27 October 2026.
+Package: **0.3.20**, prepared 28 October 2026.
 
 ## Privacy changes
 
@@ -29,3 +29,5 @@ An intermittent SDR stall was mitigated by detection/recovery; its hardware caus
 The release-signing public key and its fingerprint are intentionally public. Private signing keys/passwords are never included. Signed-channel publication requires a publisher signature; device enrollment and RF validation remain device-side checks.
 
 Retention remains disabled by default. Enabled cleanup deletes eligible active database receptions and linked upload/validation payloads; it does not securely erase SD blocks or purge existing backups, notes or diagnostic logs. Power controls use the existing local-dashboard/CSRF model and a narrow root broker. Keep the dashboard on a trusted network.
+
+Wi-Fi recovery inspects local current-boot journals, but stores/displays only fixed reasons and counters; it does not publish raw journal content. Recovery thresholds are fault evidence, not Internet connectivity or client count. Limits are scoped to the broker lifetime.

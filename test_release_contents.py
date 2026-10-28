@@ -95,6 +95,10 @@ ALLOWED={
     'test_sdr_health.py',
     'test_wifi_forget.py',
     'test_wifi_mac.py',
+    'test_wifi_recovery.py',
+    'release-notes/v0.3.20.md',
+    'updates/candidates/0.3.20.json',
+    'updates/releases/0.3.20.json',
     'verify_recovery.py',
     'wifi_control.py',
 }
@@ -107,4 +111,4 @@ class ReleaseContentsTests(unittest.TestCase):
             relative=path.relative_to(ROOT)
             if any(part in excluded for part in relative.parts):continue
             if path.is_file():actual.add(relative.as_posix())
-        self.assertEqual(actual-{'updates/stable.json','updates/candidates/0.3.15.json','updates/candidates/0.3.16.json','updates/releases/0.3.15.json','updates/releases/0.3.16.json','updates/candidates/0.3.17.json','updates/releases/0.3.17.json','updates/candidates/0.3.18.json','updates/releases/0.3.18.json','updates/candidates/0.3.19.json','updates/releases/0.3.19.json'},ALLOWED-{'updates/stable.json','updates/candidates/0.3.15.json','updates/candidates/0.3.16.json','updates/releases/0.3.15.json','updates/releases/0.3.16.json','updates/candidates/0.3.17.json','updates/releases/0.3.17.json','updates/candidates/0.3.18.json','updates/releases/0.3.18.json','updates/candidates/0.3.19.json','updates/releases/0.3.19.json'},'Review unexpected files before creating a software release')
+        self.assertEqual(actual-{'updates/stable.json','updates/candidates/0.3.15.json','updates/candidates/0.3.16.json','updates/releases/0.3.15.json','updates/releases/0.3.16.json','updates/candidates/0.3.17.json','updates/releases/0.3.17.json','updates/candidates/0.3.18.json','updates/releases/0.3.18.json','updates/candidates/0.3.19.json','updates/releases/0.3.19.json','updates/candidates/0.3.20.json','updates/releases/0.3.20.json'},ALLOWED-{'updates/stable.json','updates/candidates/0.3.15.json','updates/candidates/0.3.16.json','updates/releases/0.3.15.json','updates/releases/0.3.16.json','updates/candidates/0.3.17.json','updates/releases/0.3.17.json','updates/candidates/0.3.18.json','updates/releases/0.3.18.json','updates/candidates/0.3.19.json','updates/releases/0.3.19.json','updates/candidates/0.3.20.json','updates/releases/0.3.20.json'},'Review unexpected files before creating a software release')
