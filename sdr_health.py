@@ -175,7 +175,7 @@ def broker_reset():
     if history and now-max(history) < 120:
         raise RuntimeError('SDR reset cooldown active; reconnect the dongle if needed')
     if len(history) >= 3:
-        raise RuntimeError('SDR reset limit reached (3 per hour); reconnect the dongle')
+        return exhausted_recovery()
     history.append(now)
     fd = os.open(RESET_HISTORY, os.O_WRONLY | os.O_CREAT | os.O_TRUNC | os.O_NOFOLLOW, 0o600)
     with os.fdopen(fd, 'w') as stream:
@@ -185,6 +185,53 @@ def broker_reset():
     if result.returncode:
         raise RuntimeError('Targeted SDR USB reset failed; reconnect the dongle')
     return json.loads(result.stdout)
+
+def recovery_policy(value=None):
+    """Root-owned policy; ordinary receiver processes cannot enable reboot."""
+    import update_manager as u
+    path = u.STATE/'sdr-recovery.json'
+    try:
+        data = json.loads(path.read_text())
+        if not isinstance(data, dict) or type(data.get('enabled', False)) is not bool:
+            raise ValueError('Invalid SDR recovery policy')
+    except FileNotFoundError:
+        data = {'enabled': False}
+    if value is not None:
+        if set(value) != {'action', 'enabled'} or type(value['enabled']) is not bool:
+            raise RuntimeError('Choose a boolean SDR reboot policy')
+        data['enabled'] = value['enabled']
+        u.put(path, data)
+    return data
+
+
+def exhausted_recovery():
+    """Only called after a new radio fault exhausts the bounded USB resets."""
+    import logging
+    import update_manager as u
+    policy = recovery_policy()
+    if not policy.get('enabled'):
+        raise RuntimeError('SDR reset limit reached (3 per hour); automatic reboot is disabled')
+    now = time.time()
+    previous = policy.get('last_reboot_epoch')
+    # Fail closed on future timestamps as well as recent reboots.
+    if previous is not None and now - float(previous) < 3600:
+        raise RuntimeError('Automatic SDR reboot cooldown active (one per hour)')
+    from wifi_control import power_action
+    # Record before scheduling: power_action checks queued/interrupted updates
+    # under the same updater lock used by manual power controls.
+    policy['last_reboot_epoch'] = now
+    policy['last_reason'] = 'SDR failed again after three USB reset attempts in one hour'
+    u.put(u.STATE/'sdr-recovery.json', policy)
+    try:
+        result = power_action({'action': 'power', 'operation': 'restart'})
+    except Exception:
+        policy.pop('last_reason', None)
+        if previous is None:policy.pop('last_reboot_epoch', None)
+        else:policy['last_reboot_epoch'] = previous
+        u.put(u.STATE/'sdr-recovery.json', policy)
+        raise
+    logging.warning('Automatic SDR recovery reboot queued: %s', policy['last_reason'])
+    return dict(result, automatic_reboot=True)
 
 if __name__ == '__main__':
     import sys

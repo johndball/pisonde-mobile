@@ -14,6 +14,33 @@ from unittest.mock import patch
 import sdr_health as h
 
 class HealthTests(unittest.TestCase):
+    def test_automatic_reboot_opt_in_and_persistent_cooldown(self):
+        import update_manager as u
+        import wifi_control as w
+        with tempfile.TemporaryDirectory() as tmp, patch.object(u,'STATE',Path(tmp)), \
+             patch.object(h.time,'time',return_value=10000), patch.object(w,'power_action',return_value={'queued':'restart'}) as power:
+            self.assertFalse(h.recovery_policy()['enabled'])
+            with self.assertRaises(RuntimeError):h.exhausted_recovery()
+            power.assert_not_called()
+            h.recovery_policy({'action':'sdr_recovery','enabled':True})
+            self.assertTrue(h.exhausted_recovery()['automatic_reboot'])
+            with self.assertRaises(RuntimeError):h.exhausted_recovery()
+            self.assertEqual(power.call_count,1)
+            h.recovery_policy({'action':'sdr_recovery','enabled':False})
+            h.recovery_policy({'action':'sdr_recovery','enabled':True})
+            with self.assertRaises(RuntimeError):h.exhausted_recovery()
+            self.assertEqual(power.call_count,1)
+
+    def test_update_block_does_not_consume_reboot_cooldown(self):
+        import update_manager as u
+        import wifi_control as w
+        with tempfile.TemporaryDirectory() as tmp, patch.object(u,'STATE',Path(tmp)), \
+             patch.object(w,'power_action',side_effect=RuntimeError('Update active')):
+            h.recovery_policy({'action':'sdr_recovery','enabled':True})
+            with self.assertRaises(RuntimeError):h.exhausted_recovery()
+            self.assertNotIn('last_reboot_epoch',h.recovery_policy())
+            with self.assertRaises(RuntimeError):h.recovery_policy({'action':'sdr_recovery','enabled':'yes'})
+
     def monitor(self):
         clock=[0.];count=[100]
         monitor=h.FlowMonitor(123,clock=lambda:clock[0],counter=lambda pid:count[0])

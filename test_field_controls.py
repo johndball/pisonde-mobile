@@ -13,6 +13,16 @@ class RetentionTests(unittest.TestCase):
         self.m=self.fixture.m;self.f=self.fixture.f;self.client=self.fixture.client
         self.client.get('/')
         with self.client.session_transaction() as session:self.headers={'X-CSRF-Token':session['token']}
+    def test_sdr_reboot_policy_requires_csrf_and_boolean(self):
+        self.assertEqual(self.client.post('/api/sdr-recovery',json={'enabled':True}).status_code,403)
+        self.assertEqual(self.client.post('/api/sdr-recovery',headers=self.headers,json={'enabled':'yes'}).status_code,400)
+        with patch.object(self.f,'broker',return_value={'enabled':True}) as broker:
+            self.assertEqual(self.client.get('/api/sdr-recovery').json,{'enabled':True})
+            broker.assert_called_with('sdr_recovery')
+            self.assertEqual(self.client.post('/api/sdr-recovery',headers=self.headers,json={'enabled':True}).status_code,200)
+            broker.assert_called_with('sdr_recovery',enabled=True)
+        self.assertIn('Reboot PiSonde if SDR recovery is exhausted',self.client.get('/device').text)
+
     def add(self,call='TEST',days=100,lat=38.,lon=-77.,raw='packet'):
         when=(datetime.now(timezone.utc)-timedelta(days=days)).isoformat()
         ident=self.fixture.add(call=call,lat=lat,lon=lon,when=when)

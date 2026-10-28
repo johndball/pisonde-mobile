@@ -432,6 +432,17 @@ def retention_worker():
             if M.shutdown_event.wait(1):return
             if retention_wake.is_set():retention_wake.clear();break
 
+def sdr_recovery_api():
+    if request.method == 'POST':
+        M.csrf()
+        value=request.get_json(silent=True)
+        if not isinstance(value,dict) or set(value)!={'enabled'} or type(value['enabled']) is not bool:
+            return jsonify(error='Choose a boolean SDR reboot policy'),400
+    else:value={}
+    try:return jsonify(broker('sdr_recovery',**value))
+    except Exception as exc:return jsonify(error=str(exc)),409
+
+
 def power_api():
     M.csrf();value=request.get_json(silent=True)
     if not isinstance(value,dict) or set(value)!={'operation'} or value['operation'] not in ('restart','shutdown'):
@@ -476,6 +487,7 @@ def install(module,start_threads=True):
     M.app.add_url_rule('/upload-report.json','field_upload_report',upload_report)
     M.app.add_url_rule('/api/retention','field_retention',retention_api,methods=['GET','POST'])
     M.app.add_url_rule('/device','field_device',device_page)
+    M.app.add_url_rule('/api/sdr-recovery','field_sdr_recovery',sdr_recovery_api,methods=['GET','POST'])
     M.app.add_url_rule('/api/power','field_power',power_api,methods=['POST'])
     M.app.add_url_rule('/api/uploads','field_uploads_api',upload_settings,methods=['POST'])
     M.app.add_url_rule('/api/upload-test','field_test',development_upload_test,methods=['POST'])
@@ -501,7 +513,7 @@ body{font:18px system-ui;margin:16px;max-width:850px}input,button,select,textare
 
 def device_page():
     controls=POWER_UI.replace('<details class="device-controls"><summary>Device controls</summary>','<section class="device-controls">').replace('</details>','</section>')
-    return page('<h2>Device controls</h2>'+controls)
+    return page('<h2>Device controls</h2>'+controls+SDR_RECOVERY_UI)
 
 def navigation():
     links=(('/','Receiver'),('/wifi','Wi-Fi'),('/history','History'),('/uploads','Uploads'),('/updates','Updates'),('/device','Device controls'),('/help','Help'))
@@ -684,3 +696,16 @@ def test_horus_packet():
     if not packet or not TESTNAME.fullmatch(packet['callsign']):abort(400)
     row=M.store_packet(packet,'HORUS',432501000)
     return jsonify(id=row['id'],callsign=row['callsign'],development_only=True)
+
+SDR_RECOVERY_UI='''<section class="device-controls"><h3>SDR recovery</h3>
+<label><input type="checkbox" id="sdr-reboot" style="width:auto" disabled> Reboot PiSonde if SDR recovery is exhausted</label>
+<p>After three USB reset attempts within an hour, another SDR failure can trigger a Pi reboot. Disabled by default. At most one automatic reboot per hour; updates and pending power operations block reboot.</p>
+<button id="save-sdr-recovery" disabled>Save SDR recovery</button><p id="sdr-recovery-result" role="status"></p></section>
+<script>
+(async()=>{
+ const check=document.getElementById('sdr-reboot'),save=document.getElementById('save-sdr-recovery'),out=document.getElementById('sdr-recovery-result');
+ try{const r=await fetch('/api/sdr-recovery');const v=await r.json();if(!r.ok)throw Error(v.error||'Could not load recovery policy');check.checked=v.enabled;check.disabled=false;save.disabled=false;}
+ catch(e){out.textContent=e.message;}
+ save.onclick=async()=>{save.disabled=true;try{const r=await fetch('/api/sdr-recovery',{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':{{token|tojson}}},body:JSON.stringify({enabled:check.checked})});const v=await r.json();if(!r.ok)throw Error(v.error||'Could not save policy');out.textContent=v.enabled?'Automatic SDR recovery reboot enabled.':'Automatic SDR recovery reboot disabled.';}catch(e){out.textContent=e.message;}finally{save.disabled=false;}};
+})();
+</script>'''

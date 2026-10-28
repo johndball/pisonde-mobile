@@ -130,3 +130,9 @@ See the [screenshot gallery](docs/screenshots/README.md) for the Device controls
 ## Wi-Fi recovery (0.3.20)
 
 The root broker checks recent current-boot driver/control errors every 30 seconds, independently of the receiver app. It ignores ordinary coverage loss and idle APs. Three relevant journal entries within 120 seconds qualify; repeated entries are deduplicated. Startup grace is 90 seconds. Isolated adapter recovery has a five-minute cooldown and three-attempt hourly cap per adapter. Only fresh errors on both adapters after isolated recovery permit a shared supplicant restart (15-minute cooldown, twice per hour), which briefly affects both Wi-Fi paths. No automatic Pi reboot, USB power cycle or driver unload is added. Update and power operations defer recovery. Wi-Fi displays attempt counters and fixed diagnostic reasons; counters/limits reset with the broker process. AP activation is checked independently of the receiver. These mitigations do not establish or fix the underlying driver fault; verify on hardware. An active AP profile still does not prove a phone can associate or obtain DHCP.
+
+### Optional final SDR recovery
+
+Under **Device controls → SDR recovery**, enable **Reboot PiSonde if SDR recovery is exhausted** and save. The default is off. If the SDR fails again after three targeted USB reset attempts within one hour, PiSonde can schedule a safe Pi reboot using the same interlocks as the manual Restart Pi button. Updates, interrupted update recovery and pending power operations block it. A blocked request is retried by subsequent SDR recovery attempts without consuming the reboot allowance.
+
+Automatic recovery allows at most one reboot per hour, with the last attempt persisted across boots. The trigger is a sample-output/pipeline fault, not an absence of decoded packets. Rebooting may recover the receiver, but the underlying hardware/driver stall still requires field investigation.
