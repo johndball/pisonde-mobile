@@ -1,0 +1,30 @@
+{
+  "schema": 2,
+  "compatibility": "app-only-v1",
+  "version": "0.3.20",
+  "commit": "0418c634e05f3e8383d8cfc07aeeb0932c63f05a",
+  "files": {
+    "field_features.py": "80bb47d491eb45f05d0a632503c7f86572b4c325629125406f4922657bcc5c2f",
+    "field_ui.py": "22b88c32f4f34939b7e1726e3898ce7c6c02ca64a58e768cf92be23e22c3f624",
+    "hardware.py": "a36d90e32e93e20aeb6a0db245b0dfc4b3619da535f3e61aee360627262274de",
+    "mobile.py": "0c22830e67b8990208989eca4c2a4cdb6221fa2ca5d235dc03da865d76f4aa07",
+    "sdr_health.py": "220239f33a6441b63572e00054bc1fe8369d32b63687396297d4bd5ca99ffc07",
+    "storage_maintenance.py": "2dc51f72f7506fc8902c657d0f44a83a4129669092af6a9455147ea781253fa5",
+    "update_manager.py": "5d5241d85f451357456bba5ee3751626295c176b9b555a1403fce7922909a794",
+    "update_ui.py": "a4e38d0e9caad3adcbed092fe1cc5ecc2dce41ec5379e0e54b6ca6c9fa0e66f1",
+    "verify_recovery.py": "37007551815001d3ab42df036a194c331c1ef320cab9c46018d81a681f7dfc79",
+    "wifi_control.py": "357fe07b73ce95af5273133eb1bc3d499e0c5b8abdae85228e13df454b33bc8e"
+  },
+  "security": {
+    "repository": "johndball/pisonde-mobile",
+    "channel": "signed-stable",
+    "sequence": 6,
+    "issued_at": "2026-10-28T17:14:06Z",
+    "expires_at": "2027-01-26T17:14:06Z"
+  },
+  "signature": {
+    "algorithm": "ed25519",
+    "key_id": "34e43261378f0235107cc0d1e3eb8d2bed7d44c44d995323d7646203235dbfd0",
+    "value": "mw/r39JlqIlPXuX1xQhuQYMrC7l0pj0ZIz7fJYNz5NySxdfirw0xTbtX2iaCC+9fq+qDGSNxTRc13TpZYFSZCg=="
+  }
+}

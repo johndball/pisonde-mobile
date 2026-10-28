@@ -2,7 +2,7 @@
 
 Application versions, stable-channel deployments and GitHub Releases are related but distinct. An enrolled device installs only the immutable source snapshot authenticated by `updates/signed-stable.json` (legacy devices use `updates/stable.json`); publishing a tag alone does not deploy code. GitHub Releases are available from the repository's Releases page.
 
-## 0.3.20 — pending publisher signature
+## 0.3.20 — 2026-10-28
 
 - Show packet altitude in meters, feet and miles using exact unit conversions without changing stored data or altitude reference.
 - Add independent root-broker Wi-Fi fault monitoring with current-boot journal deduplication, startup grace, adapter-specific recovery and cooldown/hourly limits.
