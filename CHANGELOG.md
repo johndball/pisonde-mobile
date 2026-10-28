@@ -2,7 +2,7 @@
 
 Application versions, stable-channel deployments and GitHub Releases are related but distinct. An enrolled device installs only the immutable source snapshot authenticated by `updates/signed-stable.json` (legacy devices use `updates/stable.json`); publishing a tag alone does not deploy code. GitHub Releases are available from the repository's Releases page.
 
-## 0.3.21 — pending publisher signature
+## 0.3.21 — 2026-10-28
 
 - Return a fixed SDR recovery API failure message instead of raw exception text; keep diagnostic tracebacks in the local service journal. Add GET/POST exception-exposure regression coverage.
 - Add an opt-in Device controls setting to reboot the Pi when another SDR fault occurs after the three-per-hour USB reset budget is exhausted.
