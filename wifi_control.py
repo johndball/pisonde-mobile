@@ -259,6 +259,10 @@ def handle(value):
     if action=='update':
         from update_manager import broker_action
         return broker_action(value)
+    if action=='sdr_recovery':
+        from sdr_health import recovery_policy
+        if set(value)=={'action'}:return recovery_policy()
+        return recovery_policy(value)
     if action=='sdr_reset':
         if set(value)!={'action'}:raise RuntimeError('SDR reset accepts no device parameters')
         from sdr_health import broker_reset

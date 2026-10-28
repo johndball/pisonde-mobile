@@ -2,6 +2,14 @@
 
 Application versions, stable-channel deployments and GitHub Releases are related but distinct. An enrolled device installs only the immutable source snapshot authenticated by `updates/signed-stable.json` (legacy devices use `updates/stable.json`); publishing a tag alone does not deploy code. GitHub Releases are available from the repository's Releases page.
 
+## Unreleased
+
+- Return a fixed SDR recovery API failure message instead of raw exception text; keep diagnostic tracebacks in the local service journal. Add GET/POST exception-exposure regression coverage.
+
+- Add an opt-in Device controls setting to reboot the Pi when another SDR fault occurs after the three-per-hour USB reset budget is exhausted.
+- Persist the policy and a one-hour reboot cooldown across service/Pi restarts. Keep automatic reboot disabled by default and use existing update/power interlocks; a deferred reboot does not consume the cooldown.
+- Log automatic recovery reboot reasons and show the pending reboot in receiver status. Missing decoded packets alone never trigger this action.
+
 ## 0.3.20 — 2026-10-28
 
 - Show packet altitude in meters, feet and miles using exact unit conversions without changing stored data or altitude reference.

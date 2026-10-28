@@ -549,6 +549,10 @@ def recover_radio(exc,rev):
         publish(sdr_state='Resetting RTL-SDR')
         try:
             result=request_reset()
+            if result.get('automatic_reboot'):
+                publish(phase='Automatic recovery reboot queued',sdr_state='Restarting Pi',error='SDR recovery exhausted; reboot scheduled')
+                shutdown_event.wait(10)
+                return
             radio_recovery.resets+=1
             publish(sdr_usb_resets=radio_recovery.resets)
             logging.warning('SDR watchdog: %s',result)
