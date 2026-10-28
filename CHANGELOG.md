@@ -2,7 +2,7 @@
 
 Application versions, stable-channel deployments and GitHub Releases are related but distinct. An enrolled device installs only the immutable source snapshot authenticated by `updates/signed-stable.json` (legacy devices use `updates/stable.json`); publishing a tag alone does not deploy code. GitHub Releases are available from the repository's Releases page.
 
-## 0.3.19 — pending publisher signature
+## 0.3.19 — 2026-10-28
 
 - Remove direct DFM/RS41 uploads to sondehub.org and weather upload payload generation. Keep weather decoding, local coordinates, raw packets, notes, CSV and GPX.
 - Disable old pending weather jobs at startup and before upload processing, preserving their history and payload archives. Re-enabling uploads cannot resume weather uploads.

@@ -1,30 +1,30 @@
 {
   "schema": 2,
   "compatibility": "app-only-v1",
-  "version": "0.3.18",
-  "commit": "1c0051bceee58ce998c306457a90b4f60c4c6079",
+  "version": "0.3.19",
+  "commit": "0013bd886fef50fae5a952fcf3b424d052e22a1e",
   "files": {
-    "field_features.py": "0a7407a30497e1da2e35e20b7496400b26b2a369503e71666a8fe54b5977a60a",
-    "field_ui.py": "40484db642c9b39c3fb46376d6ad5bafa8a489436ad783dfd1cad5e44313f3bf",
+    "field_features.py": "8600f350cd3fec2e8a9813a69bd975dd36c52fd535ef23b16a8032389d432a8b",
+    "field_ui.py": "0926e11b7c6267a6c7e1881207f62497904a0cee697fc1f4f135a03145b819da",
     "hardware.py": "a36d90e32e93e20aeb6a0db245b0dfc4b3619da535f3e61aee360627262274de",
-    "mobile.py": "8366e96fffb4f87c2ab3050e2bbf31273ad3ebb09c1a9169348b4843c63df745",
+    "mobile.py": "9148a1dcd23f16e6f753d9d062b7c62c8c68fb103337be158d1dcaaea3269cbe",
     "sdr_health.py": "220239f33a6441b63572e00054bc1fe8369d32b63687396297d4bd5ca99ffc07",
     "storage_maintenance.py": "2dc51f72f7506fc8902c657d0f44a83a4129669092af6a9455147ea781253fa5",
-    "update_manager.py": "bb277293393d2b93bd1e53797cdde7c644fd92a0b93b4c51e9a1d9485e8847e1",
+    "update_manager.py": "5e59a52da0a9649a964e3ba1b8728d9620b8affaebca7dc7372f6bb521231ed2",
     "update_ui.py": "a4e38d0e9caad3adcbed092fe1cc5ecc2dce41ec5379e0e54b6ca6c9fa0e66f1",
-    "verify_recovery.py": "9781e6fa815366c8f9548c2a35e57432e23d42b4a8c1864f0799b1c4b5c5164a",
+    "verify_recovery.py": "d60e1981c2dd7646eb17c1d5e8bb5b10b409a7aa9a49a98679571817027b1201",
     "wifi_control.py": "de20b44b171fc308f5199f1027cc79bf892daf3a9af663e460a54ae9a31e6f62"
   },
   "security": {
     "repository": "johndball/pisonde-mobile",
     "channel": "signed-stable",
-    "sequence": 4,
-    "issued_at": "2026-10-27T18:28:56Z",
-    "expires_at": "2027-01-25T18:28:56Z"
+    "sequence": 5,
+    "issued_at": "2026-10-28T11:18:51Z",
+    "expires_at": "2027-01-26T11:18:51Z"
   },
   "signature": {
     "algorithm": "ed25519",
     "key_id": "34e43261378f0235107cc0d1e3eb8d2bed7d44c44d995323d7646203235dbfd0",
-    "value": "T7IvT1Lhq9nlf+9eNewX91MRXo8xOTmgVIYPIFQNwGtBt48S8olqggnlwS+xlW+jaAKa3K6Meh5eHjs9ShGhAA=="
+    "value": "DsE0jUIzBPke0wupZOZshA4tqM27+jNtnwluTkwdtn9d8DYgIlI9pvT9t3En5jApEjbvkqfZG9OzKlPfx5TVCA=="
   }
 }
