@@ -41,6 +41,26 @@ class HealthTests(unittest.TestCase):
             self.assertNotIn('last_reboot_epoch',h.recovery_policy())
             with self.assertRaises(RuntimeError):h.recovery_policy({'action':'sdr_recovery','enabled':'yes'})
 
+    def test_exhausted_usb_budget_routes_new_fault_to_reboot_policy(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            history=Path(tmp)/'resets.json';history.write_text(json.dumps([100,200,300]))
+            result={'queued':'restart','automatic_reboot':True}
+            with patch.object(h,'RESET_HISTORY',history),patch.object(h.time,'monotonic',return_value=500),patch.object(h,'exhausted_recovery',return_value=result) as exhausted,patch.object(h.subprocess,'run') as reset:
+                self.assertEqual(h.broker_reset(),result)
+            exhausted.assert_called_once_with();reset.assert_not_called()
+            self.assertEqual(json.loads(history.read_text()),[100,200,300])
+
+    def test_receiver_reports_queued_reboot_without_counting_another_usb_reset(self):
+        spec=importlib.util.spec_from_file_location('reboot_mobile_test',Path(__file__).with_name('mobile.py'))
+        m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)
+        m.radio_recovery.failures=1
+        with patch.object(m,'request_reset',return_value={'queued':'restart','automatic_reboot':True}),patch.object(m.shutdown_event,'wait') as wait:
+            m.recover_radio(h.RadioFailure('sample fault'),m.revision)
+        self.assertEqual(m.status['phase'],'Automatic recovery reboot queued')
+        self.assertEqual(m.status['sdr_state'],'Restarting Pi')
+        self.assertEqual(m.radio_recovery.resets,0)
+        wait.assert_called_once_with(10)
+
     def monitor(self):
         clock=[0.];count=[100]
         monitor=h.FlowMonitor(123,clock=lambda:clock[0],counter=lambda pid:count[0])
@@ -289,7 +309,7 @@ class HealthTests(unittest.TestCase):
         from unittest.mock import mock_open
         spec=importlib.util.spec_from_file_location('field_verifier',Path(__file__).with_name('verify_recovery.py'))
         v=importlib.util.module_from_spec(spec);spec.loader.exec_module(v)
-        baseline={'version':'0.3.20','config':{'profile':'STOP'}}
+        baseline={'version':'0.3.21','config':{'profile':'STOP'}}
         with patch.object(v.sys,'argv',['verify_recovery.py','--field-only']), \
              patch.object(v.os,'geteuid',return_value=0),patch.object(v.socket,'gethostname',return_value='example-pi'), \
              patch.object(v,'open',mock_open(),create=True),patch.object(v.fcntl,'flock'), \

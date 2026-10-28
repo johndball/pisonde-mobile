@@ -1,6 +1,6 @@
-# Install PiSonde Mobile 0.3.20 — public packaging revision 1
+# Install PiSonde Mobile 0.3.21 — public packaging revision 1
 
-This is a **fresh-install source package**, not an update for an existing PiSonde installation. The receiver/GUI code is based on 0.3.20. Public packaging adds hardware discovery and removes installation-specific identities. **This fresh-SD installer has passed offline checks but has not yet been run end-to-end on a Raspberry Pi.** Keep your working card intact and use a spare card for the first installation.
+This is a **fresh-install source package**, not an update for an existing PiSonde installation. The receiver/GUI code is based on 0.3.21. Public packaging adds hardware discovery and removes installation-specific identities. **This fresh-SD installer has passed offline checks but has not yet been run end-to-end on a Raspberry Pi.** Keep your working card intact and use a spare card for the first installation.
 
 ## Requirements
 
@@ -22,7 +22,7 @@ On the Pi, using Ethernet or a local console:
 sudo apt-get update
 sudo apt-get install -y git
 cd ~
-git clone --branch v0.3.20 --depth 1 https://github.com/johndball/pisonde-mobile.git
+git clone --branch v0.3.21 --depth 1 https://github.com/johndball/pisonde-mobile.git
 cd pisonde-mobile
 sudo bash install.sh
 ```
@@ -130,6 +130,6 @@ Fresh setup installs the background update timer and Updates page. See [UPDATES.
 
 Fresh installations of 0.3.16 and newer enroll the publisher public key during `install.sh`; no separate enrollment command is needed. Hardware setup verifies the enrolled key before changing Wi-Fi. After configuration, use Updates → Check now and confirm that signatures are required and the key is enrolled. Existing enrolled devices update normally through the GUI. Unenrolled older installations still use the one-time verified enrollment installer described in [SIGNED-UPDATES.md](SIGNED-UPDATES.md).
 
-## Wi-Fi recovery (0.3.20)
+## Wi-Fi recovery (0.3.21)
 
 The root broker checks recent current-boot driver/control errors every 30 seconds, independently of the receiver app. It ignores ordinary coverage loss and idle APs. Three relevant journal entries within 120 seconds qualify; repeated entries are deduplicated. Startup grace is 90 seconds. Isolated adapter recovery has a five-minute cooldown and three-attempt hourly cap per adapter. Only fresh errors on both adapters after isolated recovery permit a shared supplicant restart (15-minute cooldown, twice per hour), which briefly affects both Wi-Fi paths. No automatic Pi reboot, USB power cycle or driver unload is added. Update and power operations defer recovery. Wi-Fi displays attempt counters and fixed diagnostic reasons; counters/limits reset with the broker process. AP activation is checked independently of the receiver. These mitigations do not establish or fix the underlying driver fault; verify on hardware. An active AP profile still does not prove a phone can associate or obtain DHCP.

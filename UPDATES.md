@@ -1,6 +1,6 @@
 # Automatic application updates
 
-PiSonde Mobile 0.3.20 uses an Updates page and a root-owned systemd worker. No GitHub token is needed for this public repository.
+PiSonde Mobile 0.3.21 uses an Updates page and a root-owned systemd worker. No GitHub token is needed for this public repository.
 
 ## Fresh installations
 
@@ -55,7 +55,7 @@ systemctl list-timers pisonde-update.timer --no-pager
 sudo journalctl -u pisonde-update-run.service -u pisonde-update-install.service -n 40 --no-pager
 ```
 
-Confirm **0.3.20** on the dashboard, the Updates controls match your chosen policy, and sample flow/reception resumes. Select **Check now** and confirm **Up to date**. Reboot during a convenient maintenance period and confirm the AP and receiver return. Hardware installation is not verified until these device-side checks succeed.
+Confirm **0.3.21** on the dashboard, the Updates controls match your chosen policy, and sample flow/reception resumes. Select **Check now** and confirm **Up to date**. Reboot during a convenient maintenance period and confirm the AP and receiver return. Hardware installation is not verified until these device-side checks succeed.
 
 All web-changing actions require the existing CSRF token and go through a narrow root broker with fixed operation names. The local dashboard uses HTTP: keep it on a trusted network and do not expose it directly to the Internet.
 

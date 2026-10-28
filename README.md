@@ -2,7 +2,7 @@
 
 A Raspberry Pi field receiver for amateur balloon and weather-sonde recovery: sequential SDR scanning, a simple phone dashboard, and durable local coordinates when recovery has to wait.
 
-**Application: 0.3.20 · Signed application updates**
+**Application: 0.3.21 · Signed application updates**
 
 Fresh installs of 0.3.16 automatically verify the signed release and enroll its public key during setup. Existing enrolled devices update through the GUI. Older unenrolled devices still need one-time [signed-update enrollment](SIGNED-UPDATES.md). Source commits alone do not deploy updates; publisher signature and signed-channel publication are required.
 
@@ -80,7 +80,7 @@ Read [CHANGELOG.md](CHANGELOG.md) for the version history and [GitHub Releases](
 
 ## Background updates
 
-Version 0.3.20 retains three independent automatic-install options: a selectable two-hour maintenance window in 24-hour local time, installation at the next reboot after a missed window, and immediate installation when a new version is detected. Checks run about every six hours. Defaults preserve scheduled 0300–0500 installation; the other options start off. Manual checks and installation remain available. Updates use a curated stable manifest pinned to immutable source commits, preserve local configuration/history and attempt rollback on failure.
+Version 0.3.21 retains three independent automatic-install options: a selectable two-hour maintenance window in 24-hour local time, installation at the next reboot after a missed window, and immediate installation when a new version is detected. Checks run about every six hours. Defaults preserve scheduled 0300–0500 installation; the other options start off. Manual checks and installation remain available. Updates use a curated stable manifest pinned to immutable source commits, preserve local configuration/history and attempt rollback on failure.
 
 For an existing device, follow the [one-time updater setup](UPDATES.md). New installations configure update support during initial hardware setup. Application updates do not install OS/dependency changes or database migrations.
 
