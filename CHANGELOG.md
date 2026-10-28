@@ -4,6 +4,8 @@ Application versions, stable-channel deployments and GitHub Releases are related
 
 ## Unreleased
 
+- Return a fixed SDR recovery API failure message instead of raw exception text; keep diagnostic tracebacks in the local service journal. Add GET/POST exception-exposure regression coverage.
+
 - Add an opt-in Device controls setting to reboot the Pi when another SDR fault occurs after the three-per-hour USB reset budget is exhausted.
 - Persist the policy and a one-hour reboot cooldown across service/Pi restarts. Keep automatic reboot disabled by default and use existing update/power interlocks; a deferred reboot does not consume the cooldown.
 - Log automatic recovery reboot reasons and show the pending reboot in receiver status. Missing decoded packets alone never trigger this action.

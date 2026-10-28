@@ -440,7 +440,9 @@ def sdr_recovery_api():
             return jsonify(error='Choose a boolean SDR reboot policy'),400
     else:value={}
     try:return jsonify(broker('sdr_recovery',**value))
-    except Exception as exc:return jsonify(error=str(exc)),409
+    except Exception:
+        logging.exception('SDR recovery policy request failed')
+        return jsonify(error='SDR recovery settings are unavailable. Check the device service log.'),409
 
 
 def power_api():

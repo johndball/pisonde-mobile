@@ -23,6 +23,17 @@ class RetentionTests(unittest.TestCase):
             broker.assert_called_with('sdr_recovery',enabled=True)
         self.assertIn('Reboot PiSonde if SDR recovery is exhausted',self.client.get('/device').text)
 
+    def test_sdr_recovery_failure_does_not_expose_exception_details(self):
+        detail='Traceback: /private/config.py:123 secret-placeholder'
+        for method in ('get','post'):
+            for failure in (RuntimeError(detail),OSError(detail)):
+                with patch.object(self.f,'broker',side_effect=failure),patch.object(self.f.logging,'exception') as log:
+                    response=(self.client.get('/api/sdr-recovery') if method=='get' else self.client.post('/api/sdr-recovery',headers=self.headers,json={'enabled':True}))
+                self.assertEqual(response.status_code,409)
+                self.assertEqual(response.json,{'error':'SDR recovery settings are unavailable. Check the device service log.'})
+                self.assertNotIn(detail,response.text)
+                log.assert_called_once_with('SDR recovery policy request failed')
+
     def add(self,call='TEST',days=100,lat=38.,lon=-77.,raw='packet'):
         when=(datetime.now(timezone.utc)-timedelta(days=days)).isoformat()
         ident=self.fixture.add(call=call,lat=lat,lon=lon,when=when)
