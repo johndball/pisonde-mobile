@@ -46,6 +46,10 @@
   },
   {
     "tag": "v0.3.21",
+    "commit": "a4822e9c59e50ca04d47d38ade4b8c954c359d90"
+  },
+  {
+    "tag": "v0.3.22",
     "commit": "signed-stable"
   }
 ]

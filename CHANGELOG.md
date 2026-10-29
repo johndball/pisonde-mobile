@@ -2,6 +2,15 @@
 
 Application versions, stable-channel deployments and GitHub Releases are related but distinct. An enrolled device installs only the immutable source snapshot authenticated by `updates/signed-stable.json` (legacy devices use `updates/stable.json`); publishing a tag alone does not deploy code. GitHub Releases are available from the repository's Releases page.
 
+## 0.3.22 — pending publisher signature
+
+- Show upstream profile names as connected only after completed Wi-Fi activation, IPv4 and gateway configuration. Label attempts/waiting states and poll cached Wi-Fi status without triggering scans.
+- Detect three CONN_FAILED authentication events spanning at least 60 seconds within 120 seconds for a network observed working by this broker. Ignore unknown networks, wrong-key events, ordinary coverage loss and idle APs.
+- Escalate persistent upstream faults from management cycling to a fixed-target AE6000 USB reset after five minutes. Cap USB attempts at two per hour with a ten-minute USB cooldown. Preserve existing AP/shared-service recovery limits and update/power interlocks.
+- Pin reset to the configured upstream MAC and Linksys AE6000 USB identity; validate the character device before ioctl. Do not reset hubs, other adapters, the RTL-SDR or onboard Wi-Fi. Run the helper as a bounded child.
+- Display upstream USB attempt counters and recovery limits. Preserve profiles, history, signing trust and the independent opt-in SDR reboot policy.
+- Pass 254 offline tests. A software USB reset is not power cycling; physical replug restored the field device, but this new reset path still requires live validation.
+
 ## 0.3.21 — 2026-10-28
 
 - Return a fixed SDR recovery API failure message instead of raw exception text; keep diagnostic tracebacks in the local service journal. Add GET/POST exception-exposure regression coverage.

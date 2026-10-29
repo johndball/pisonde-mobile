@@ -52,10 +52,83 @@ def profiles():
         data.append(dict(uuid=ident,ssid=ssid,mac=mac,mode=mode,security=security))
     return data
 
+# Fixed-target USB helper. No caller-supplied bus, port, path or MAC is accepted.
+NET_ROOT=Path('/sys/class/net')
+USB_ROOT=Path('/sys/bus/usb/devices')
+USB_DEV_ROOT=Path('/dev/bus/usb')
+CLIENT_MANAGEMENT_RESTORE=False
+
+def client_usb_target():
+    if CLIENT_MAC==AP_MAC:raise RuntimeError('Upstream and AP identities must differ')
+    matches=[]
+    for address in NET_ROOT.glob('*/address'):
+        try:
+            if address.read_text().strip().upper()!=CLIENT_MAC:continue
+            network_device=(address.parent/'device').resolve(strict=True)
+            parents=[v for v in (network_device,*network_device.parents) if (v/'idVendor').is_file()]
+            if not parents:continue
+            target=parents[0]
+            if not any(v.resolve()==target for v in USB_ROOT.iterdir()):continue
+            if (target/'idVendor').read_text().strip().lower()!='13b1' or (target/'idProduct').read_text().strip().lower()!='003e':continue
+            if (target/'bDeviceClass').read_text().strip().lower()=='09':continue
+            bus=int((target/'busnum').read_text());number=int((target/'devnum').read_text())
+            if not 1<=bus<=255 or not 1<=number<=127:continue
+            matches.append((target,USB_DEV_ROOT/f'{bus:03d}'/f'{number:03d}',(bus-1)*128+number-1))
+        except (OSError,ValueError):continue
+    if len(matches)!=1:raise RuntimeError('Exactly one configured Linksys AE6000 USB target is required')
+    return matches[0]
+
+def reset_client_usb():
+    import fcntl,stat
+    if os.geteuid()!=0:raise RuntimeError('USB Wi-Fi reset requires root')
+    target,path,minor=client_usb_target()
+    fd=os.open(path,os.O_WRONLY|os.O_NOFOLLOW)
+    try:
+        info=os.fstat(fd)
+        if not stat.S_ISCHR(info.st_mode) or os.major(info.st_rdev)!=189 or os.minor(info.st_rdev)!=minor:
+            raise RuntimeError('USB device node does not match the configured upstream adapter')
+        if client_usb_target()!=(target,path,minor):raise RuntimeError('USB Wi-Fi identity changed before reset')
+        fcntl.ioctl(fd,0x5514,0)  # USBDEVFS_RESET: device-level reset, not port power cycling.
+    finally:os.close(fd)
+    return dict(message='Targeted Linksys USB reset completed; reconnecting upstream')
+
+def restore_client_management():
+    global CLIENT_MANAGEMENT_RESTORE
+    if not CLIENT_MANAGEMENT_RESTORE:return True
+    current=device(CLIENT_MAC)
+    if not current:return False
+    nm('device','set',current,'managed','yes')
+    CLIENT_MANAGEMENT_RESTORE=False
+    return True
+
+def request_client_usb_reset():
+    result=subprocess.run(['/usr/bin/python3',str(Path(__file__).resolve()),'--reset-client-usb'],
+        capture_output=True,text=True,timeout=12)
+    if result.returncode:raise RuntimeError('Targeted Linksys USB reset failed; replug the Linksys if needed')
+    return json.loads(result.stdout)
+
+def client_link(interface):
+    if not interface:return dict(client_state='',client_connected=False,client_note='USB Wi-Fi unplugged',hotspot='',attempted_hotspot='',client_uuid='',has_ipv4=False,has_gateway=False)
+    raw=nm('-t','-f','GENERAL.STATE,GENERAL.CONNECTION,GENERAL.CON-UUID,IP4.ADDRESS,IP4.GATEWAY','device','show',interface,timeout=4)
+    data={}
+    for line in raw.splitlines():
+        row=fields(line)
+        if len(row)==2:data[row[0]]=row[1]
+    state=data.get('GENERAL.STATE','');profile=data.get('GENERAL.CONNECTION','')
+    if profile=='--':profile=''
+    has_ip=any(k.startswith('IP4.ADDRESS') and v not in ('','--') for k,v in data.items())
+    has_gateway=data.get('IP4.GATEWAY','') not in ('','--')
+    associated=state.split(' ',1)[0]=='100'
+    connected=associated and has_ip and has_gateway
+    note='Associated; waiting for IPv4/gateway' if associated and not connected else ('Connecting to upstream Wi-Fi' if state.split(' ',1)[0] in ('40','50','60','70','80','90') else 'Upstream Wi-Fi disconnected')
+    return dict(client_state=state,client_connected=connected,client_note='Associated with IPv4/gateway (Internet unverified)' if connected else note,
+        hotspot=profile if connected else '',attempted_hotspot=profile if not connected else '',client_uuid=data.get('GENERAL.CON-UUID',''),has_ipv4=has_ip,has_gateway=has_gateway)
+
+
 # Independent broker watchdog: network coverage and client count are not faults.
 # Journal messages are inspected locally; only fixed reasons/counters enter status.
 import collections,logging,re
-WIFI_RECOVERY=dict(state='Starting',adapter_attempts=0,service_attempts=0,last_reason='',last_error='')
+WIFI_RECOVERY=dict(state='Starting',adapter_attempts=0,service_attempts=0,usb_reset_attempts=0,last_reason='',last_error='')
 WIFI_JOURNAL_REASONS={
     'client':('request-scan: could not get scan request result: Timeout',
               'call-disconnect: failed with Timeout','call-remove-network: failed with Timeout'),
@@ -64,8 +137,17 @@ WIFI_JOURNAL_REASONS={
 class WifiRecovery:
     def __init__(self,clock=time.monotonic):
         self.clock=clock;self.started=clock();self.seen=set();self.events={'ap':collections.deque(maxlen=40),'client':collections.deque(maxlen=40)}
-        self.attempts={'ap':collections.deque(),'client':collections.deque(),'service':collections.deque()}
-        self.last_attempt={'ap':float('-inf'),'client':float('-inf'),'service':float('-inf')}
+        self.auth=collections.deque(maxlen=40);self.known_networks=set();self.profile_cache={};self.client_stage=False;self.client_connected=False;self.limited=False
+        self.attempts={r:collections.deque() for r in ('ap','client','usb','service')}
+        self.last_attempt={r:float('-inf') for r in self.attempts}
+    def observe_link(self,link):
+        self.client_connected=link.get('client_connected',False)
+        if self.client_connected:
+            ident=link.get('client_uuid','')
+            if ident and ident!='--':
+                if ident not in self.profile_cache:self.profile_cache[ident]=nm('-g','802-11-wireless.ssid','connection','show',ident,timeout=4)
+                self.known_networks.add(self.profile_cache[ident])
+            self.client_stage=False;self.events['client'].clear();self.auth.clear()
     def ingest(self,rows,ap,client):
         now=self.clock()
         for row in rows:
@@ -77,25 +159,43 @@ class WifiRecovery:
             role=None
             if kernel and ap and any(v in message for v in WIFI_JOURNAL_REASONS['ap']):role='ap'
             elif client and unit in ('NetworkManager.service','wpa_supplicant.service') and re.search(r'(?<![\w-])'+re.escape(client)+r'(?![\w-])',message) and any(v in message for v in WIFI_JOURNAL_REASONS['client']):role='client'
-            if role:self.events[role].append(now)
+            when=now
+            try:when=float(row.get('__MONOTONIC_TIMESTAMP',now*1000000))/1000000
+            except (TypeError,ValueError):continue
+            if not 0<=now-when<=120:continue
+            if role:self.events[role].append(when)
+            if client and not self.client_connected and unit=='wpa_supplicant.service' and message.startswith(client+': ') and 'CTRL-EVENT-SSID-TEMP-DISABLED' in message and 'reason=CONN_FAILED' in message:
+                match=re.search(r'\bssid="([^"\\]*)"',message)
+                if match and match[1] in self.known_networks:self.auth.append((when,match[1]))
         for role in self.events:
-            while self.events[role] and now-self.events[role][0]>120:self.events[role].popleft()
+            self.events[role]=collections.deque((t for t in self.events[role] if now-t<=120),maxlen=40)
+        self.auth=collections.deque((v for v in self.auth if now-v[0]<=120),maxlen=40)
     def choose(self,ap,client):
-        now=self.clock()
+        now=self.clock();self.limited=False
         if now-self.started<90:return None
         for role in self.attempts:
             while self.attempts[role] and now-self.attempts[role][0]>=3600:self.attempts[role].popleft()
         bad={r:len(self.events[r])>=3 for r in self.events}
+        for ssid in self.known_networks:
+            times=[t for t,name in self.auth if name==ssid]
+            if len(times)>=3 and max(times)-min(times)>=60:bad['client']=True
+        if self.client_connected:bad['client']=False
         # Shared service restart is last resort: both adapters must have fresh
         # fault evidence, and each must already have had an isolated attempt.
         if ap and client and all(bad.values()) and all(self.attempts[r] for r in ('ap','client')) and now-self.last_attempt['service']>=900 and len(self.attempts['service'])<2:
             return 'service'
         for role,present in (('ap',ap),('client',client)):
-            if present and bad[role] and now-self.last_attempt[role]>=300 and len(self.attempts[role])<3:return role
+            if not present or not bad[role]:continue
+            if role=='client' and self.client_stage:
+                if now-self.last_attempt['client']>=300 and now-self.last_attempt['usb']>=600 and len(self.attempts['usb'])<2:return 'usb'
+            elif now-self.last_attempt[role]>=300 and len(self.attempts[role])<3:return role
+            self.limited=True
         return None
     def record(self,role):
         now=self.clock();self.last_attempt[role]=now;self.attempts[role].append(now)
+        if role in ('client','usb'):self.client_stage=True
         for key in self.events:self.events[key].clear()
+        self.auth.clear()
 
 wifi_recovery=WifiRecovery()
 
@@ -113,6 +213,7 @@ def wifi_journal(since):
     return rows
 
 def recover_wifi(role):
+    global CLIENT_MANAGEMENT_RESTORE
     ap=device(AP_MAC);client=device(CLIENT_MAC)
     if role=='service':
         result=subprocess.run(['/usr/bin/systemctl','restart','wpa_supplicant.service'],capture_output=True,timeout=25)
@@ -122,22 +223,44 @@ def recover_wifi(role):
         nm('connection','up',AP,timeout=18)
         return
     interface=ap if role=='ap' else client
-    if not interface:return
+    if not interface:raise RuntimeError('Affected Wi-Fi adapter is unavailable')
+    if role=='usb':
+        CLIENT_MANAGEMENT_RESTORE=True
+        try:
+            try:nm('device','set',interface,'managed','no')
+            except Exception:logging.warning('Upstream management detach did not complete; attempting fixed-target USB reset')
+            WIFI_RECOVERY['usb_reset_attempts']+=1
+            request_client_usb_reset()
+        finally:
+            for _ in range(10):
+                if restore_client_management():break
+                time.sleep(.5)
+            # If re-enumeration is slower, the broker guard restores by MAC
+            # on a later tick; never operate on a stale interface name.
+        interface=device(CLIENT_MAC)
+        if not interface:raise RuntimeError('USB Wi-Fi interface has not returned; inspect/replug the Linksys')
+        reconnect_client(interface)
+        return
     # Preserve profiles and hardware bindings. Never create an upstream profile.
     try:nm('device','set',interface,'managed','no')
     finally:nm('device','set',interface,'managed','yes')
     if role=='ap':nm('connection','up',AP,'ifname',interface,timeout=18)
-    else:
-        saved=[p for p in profiles() if p['uuid']!=AP and p['mac']==CLIENT_MAC and p['mode']!='ap' and p['ssid'] not in forgotten()]
-        saved.sort(key=lambda p:int(nm('-g','connection.autoconnect-priority','connection','show',p['uuid']) or 0),reverse=True)
-        if saved:nm('connection','up',saved[0]['uuid'],'ifname',interface,timeout=18)
+    else:reconnect_client(interface)
+
+def reconnect_client(interface):
+    saved=[p for p in profiles() if p['uuid']!=AP and p['mac']==CLIENT_MAC and p['mode']!='ap' and p['ssid'] not in forgotten()]
+    saved.sort(key=lambda p:int(nm('-g','connection.autoconnect-priority','connection','show',p['uuid']) or 0),reverse=True)
+    if saved:nm('connection','up',saved[0]['uuid'],'ifname',interface,timeout=18)
 
 def wifi_health_tick(rows):
     ap=device(AP_MAC);client=device(CLIENT_MAC)
+    try:wifi_recovery.observe_link(client_link(client))
+    except Exception:wifi_recovery.client_connected=False
     wifi_recovery.ingest(rows,ap,client)
     role=wifi_recovery.choose(ap,client)
+    if wifi_recovery.client_connected:WIFI_RECOVERY['last_error']=''
     if role is None:
-        WIFI_RECOVERY['state']='Monitoring (90-second startup grace)' if wifi_recovery.clock()-wifi_recovery.started<90 else 'Monitoring'
+        WIFI_RECOVERY['state']='Recovery cooldown/limit active; inspect or replug Linksys if persistent' if wifi_recovery.limited else 'Monitoring (90-second startup grace)' if wifi_recovery.clock()-wifi_recovery.started<90 else 'Monitoring'
         return
     if not operation_lock.acquire(blocking=False):return
     try:
@@ -147,7 +270,7 @@ def wifi_health_tick(rows):
             if updater.power_pending() or (updater.STATE/'pending.json').exists() or (state.get('phase')=='Queued' and not state.get('completed_at')):
                 WIFI_RECOVERY['state']='Deferred for update/power operation';return
             wifi_recovery.record(role)
-            reason='Both adapters repeatedly failing after isolated recovery' if role=='service' else ('Repeated onboard authentication failures' if role=='ap' else 'Repeated upstream Wi-Fi control timeouts')
+            reason='Both adapters repeatedly failing after isolated recovery' if role=='service' else ('Repeated onboard authentication failures' if role=='ap' else ('Persistent upstream failure after adapter management recovery' if role=='usb' else 'Repeated upstream Wi-Fi control/authentication failures'))
             counter='service_attempts' if role=='service' else 'adapter_attempts'
             WIFI_RECOVERY.update(state='Recovering '+role,last_reason=reason,last_error='')
             WIFI_RECOVERY[counter]+=1
@@ -173,6 +296,11 @@ def wifi_health_watch():
             # Recover a missing/inactive AP even if the receiver app is stopped.
             if operation_lock.acquire(blocking=False):
                 try:
+                    if CLIENT_MANAGEMENT_RESTORE:
+                        import update_manager as updater
+                        with updater.locked():
+                            state=updater.status()
+                            if not updater.power_pending() and not (updater.STATE/'pending.json').exists() and not (state.get('phase')=='Queued' and not state.get('completed_at')):restore_client_management()
                     ap=device(AP_MAC)
                     if ap and nm('-g','GENERAL.CON-UUID','device','show',ap)!=AP:
                         import update_manager as updater
@@ -189,10 +317,8 @@ def wifi_health_watch():
 def status():
     client=device(CLIENT_MAC);ap=device(AP_MAC)
     result=dict(ap_mac=AP_MAC,client_mac=CLIENT_MAC,ap_interface=ap,client_interface=client,onboard_present=bool(ap),usb_present=bool(client),role_layout=ROLE_LAYOUT,ap_present=bool(ap),hotspot='',client_state='',ap_state='',recovery=dict(WIFI_RECOVERY))
-    if client:
-        result['client_state']=nm('-g','GENERAL.STATE','device','show',client)
-        active=nm('-g','GENERAL.CONNECTION','device','show',client)
-        result['hotspot']=active if active!='--' else ''
+    try:result.update(client_link(client))
+    except Exception:result.update(client_connected=False,client_note='Upstream status unavailable',attempted_hotspot='')
     if ap:result['ap_state']=nm('-g','GENERAL.STATE','device','show',ap)
     return result
 
@@ -344,6 +470,10 @@ class Handler(StreamRequestHandler):
         self.wfile.write(json.dumps(response).encode()+b'\n')
 
 if __name__=='__main__':
+    import sys
+    if sys.argv[1:]:
+        if sys.argv[1:]!=['--reset-client-usb']:raise SystemExit('Unsupported broker arguments')
+        print(json.dumps(reset_client_usb()));raise SystemExit(0)
     # Update timer migrations must not prevent field Wi-Fi control starting.
     try:
         from update_manager import ensure_support

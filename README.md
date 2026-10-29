@@ -2,7 +2,7 @@
 
 A Raspberry Pi field receiver for amateur balloon and weather-sonde recovery: sequential SDR scanning, a simple phone dashboard, and durable local coordinates when recovery has to wait.
 
-**Application: 0.3.21 · Signed application updates**
+**Application: 0.3.22 · Signed application updates**
 
 Fresh installs of 0.3.16 automatically verify the signed release and enroll its public key during setup. Existing enrolled devices update through the GUI. Older unenrolled devices still need one-time [signed-update enrollment](SIGNED-UPDATES.md). Source commits alone do not deploy updates; publisher signature and signed-channel publication are required.
 
@@ -80,7 +80,7 @@ Read [CHANGELOG.md](CHANGELOG.md) for the version history and [GitHub Releases](
 
 ## Background updates
 
-Version 0.3.21 retains three independent automatic-install options: a selectable two-hour maintenance window in 24-hour local time, installation at the next reboot after a missed window, and immediate installation when a new version is detected. Checks run about every six hours. Defaults preserve scheduled 0300–0500 installation; the other options start off. Manual checks and installation remain available. Updates use a curated stable manifest pinned to immutable source commits, preserve local configuration/history and attempt rollback on failure.
+Version 0.3.22 retains three independent automatic-install options: a selectable two-hour maintenance window in 24-hour local time, installation at the next reboot after a missed window, and immediate installation when a new version is detected. Checks run about every six hours. Defaults preserve scheduled 0300–0500 installation; the other options start off. Manual checks and installation remain available. Updates use a curated stable manifest pinned to immutable source commits, preserve local configuration/history and attempt rollback on failure.
 
 For an existing device, follow the [one-time updater setup](UPDATES.md). New installations configure update support during initial hardware setup. Application updates do not install OS/dependency changes or database migrations.
 
@@ -136,3 +136,11 @@ The root broker checks recent current-boot driver/control errors every 30 second
 Under **Device controls → SDR recovery**, enable **Reboot PiSonde if SDR recovery is exhausted** and save. The default is off. If the SDR fails again after three targeted USB reset attempts within one hour, PiSonde can schedule a safe Pi reboot using the same interlocks as the manual Restart Pi button. Updates, interrupted update recovery and pending power operations block it. A blocked request is retried by subsequent SDR recovery attempts without consuming the reboot allowance.
 
 Automatic recovery allows at most one reboot per hour, with the last attempt persisted across boots. The trigger is a sample-output/pipeline fault, not an absence of decoded packets. Rebooting may recover the receiver, but the underlying hardware/driver stall still requires field investigation.
+
+## Upstream Wi-Fi recovery (0.3.22)
+
+The connected label requires completed Wi-Fi activation, IPv4 and gateway configuration; it is not an Internet test. Attempts are shown separately and cached status refresh does not force scans. Repeated authentication CONN_FAILED events qualify only for a network previously observed working by the current broker: three events spanning at least 60 seconds within 120 seconds. A new broker starts with no known networks. Unknown networks, explicit wrong-key events and ordinary disconnection do not trigger this detector.
+
+If isolated upstream management recovery does not restore service and qualifying errors continue after five minutes, a targeted USB reset can be attempted. Only the configured upstream MAC on a Linksys AE6000 (USB 13b1:003e) is eligible; other USB Wi-Fi hardware fails closed. The ioctl target is validated as the matching USB character device and cannot be a hub, the SDR or onboard radio. It runs in a child with a 12-second timeout. USB attempts are limited to two per hour with ten minutes between USB attempts, and defer during update/power operations. Limits/counters reset with the broker process. Healthy connectivity resets escalation to management-first. The Wi-Fi page shows USB attempts.
+
+A USB device reset is not a physical power cycle. Linux describes the [USBDEVFS_RESET behavior and synchronization limitations](https://www.kernel.org/doc/html/latest/driver-api/usb/usb.html). Physical replug restored the field device; this software recovery still needs hardware validation. No automatic upstream-fault Pi reboot or USB hub reset is added. Replug the Linksys if software recovery fails.

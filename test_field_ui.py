@@ -38,7 +38,7 @@ class GuiTests(unittest.TestCase):
   for path in ['/','/help','/sondehub-approval','/wifi','/history','/uploads','/weather-validation.jsonl?type=RS41','/upload-report.json']:
    self.assertEqual(self.client.get(path).status_code,200,path)
   self.assertEqual(self.client.post('/api/control',json={'profile':'STOP'}).status_code,403)
-  page=self.client.get('/').text;self.assertIn('v0.3.21',page);self.assertIn('id="upload-status"',page);self.assertNotIn('Auto: resume searching',page)
+  page=self.client.get('/').text;self.assertIn('v0.3.22',page);self.assertIn('id="upload-status"',page);self.assertNotIn('Auto: resume searching',page)
  def test_status_reads_do_not_touch_stored_history(self):
   self.add();before=self.m.DB.read_bytes();self.status();self.status()
   with self.m.database() as db:self.assertEqual(db.execute('SELECT COUNT(*) FROM receptions').fetchone()[0],1)
@@ -50,7 +50,7 @@ class GuiTests(unittest.TestCase):
   self.assertIn('href="/updates"',self.client.get('/').text)
   self.assertEqual(self.client.post('/api/updates',json={'operation':'install'}).status_code,403)
   with self.client.session_transaction() as session:token=session['token']
-  with patch.object(self.f,'broker',return_value={'automatic':False,'installed_version':'0.3.21'}) as broker:
+  with patch.object(self.f,'broker',return_value={'automatic':False,'installed_version':'0.3.22'}) as broker:
    response=self.client.post('/api/updates',json={'operation':'set_auto','enabled':False},headers={'X-CSRF-Token':token})
    self.assertEqual(response.status_code,200);broker.assert_called_once_with('update',operation='set_auto',enabled=False)
 
@@ -85,6 +85,24 @@ class GuiTests(unittest.TestCase):
   self.assertTrue(values[2].startswith('-10.0 m · -32.8 ft'))
   self.assertIn('Altitude reported by packet:',page)
   self.assertIn('altitudeText(p.altitude_m)',page)
+
+ def test_wifi_attempt_and_usb_reset_status_are_explicit(self):
+  page=self.client.get('/wifi').text
+  for text in ('Attempting:','client_note','Upstream USB resets:','showWifiStatus(value.ui_wifi)'):
+   self.assertIn(text,page)
+  self.assertIn('w.client_note',self.client.get('/').text)
+  import re,subprocess,shutil
+  if shutil.which('node'):
+   helpers=re.search(r'(function showWifiHealth\(s\).*?)setInterval',page,re.S).group(1)
+   states=[dict(ap_mac='02:00:00:00:00:01',client_mac='02:00:00:00:00:02',ap_present=True,hotspot='Field hotspot',recovery={}),dict(ap_mac='02:00:00:00:00:01',client_mac='02:00:00:00:00:02',ap_present=True,hotspot='',client_note='Connecting to upstream Wi-Fi',attempted_hotspot='Field hotspot',recovery={}),dict(note='status unavailable')]
+   script='const nodes={};const $=id=>nodes[id]||(nodes[id]={});'+helpers+';for(const s of '+json.dumps(states)+'){showWifiStatus(s);console.log(nodes.state.textContent);}'
+   result=subprocess.run(['node','-e',script],text=True,capture_output=True,check=True)
+   lines=result.stdout.splitlines()
+   self.assertIn('Upload connection: Field hotspot',lines[0])
+   self.assertIn('Upload connection: Connecting to upstream Wi-Fi',lines[1])
+   self.assertIn('Attempting: Field hotspot',lines[1])
+   self.assertEqual(lines[2],'status unavailable')
+
 
 if __name__=='__main__':unittest.main()
 

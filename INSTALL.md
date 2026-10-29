@@ -1,6 +1,6 @@
-# Install PiSonde Mobile 0.3.21 — public packaging revision 1
+# Install PiSonde Mobile 0.3.22 — public packaging revision 1
 
-This is a **fresh-install source package**, not an update for an existing PiSonde installation. The receiver/GUI code is based on 0.3.21. Public packaging adds hardware discovery and removes installation-specific identities. **This fresh-SD installer has passed offline checks but has not yet been run end-to-end on a Raspberry Pi.** Keep your working card intact and use a spare card for the first installation.
+This is a **fresh-install source package**, not an update for an existing PiSonde installation. The receiver/GUI code is based on 0.3.22. Public packaging adds hardware discovery and removes installation-specific identities. **This fresh-SD installer has passed offline checks but has not yet been run end-to-end on a Raspberry Pi.** Keep your working card intact and use a spare card for the first installation.
 
 ## Requirements
 
@@ -22,7 +22,7 @@ On the Pi, using Ethernet or a local console:
 sudo apt-get update
 sudo apt-get install -y git
 cd ~
-git clone --branch v0.3.21 --depth 1 https://github.com/johndball/pisonde-mobile.git
+git clone --branch v0.3.22 --depth 1 https://github.com/johndball/pisonde-mobile.git
 cd pisonde-mobile
 sudo bash install.sh
 ```
@@ -130,6 +130,14 @@ Fresh setup installs the background update timer and Updates page. See [UPDATES.
 
 Fresh installations of 0.3.16 and newer enroll the publisher public key during `install.sh`; no separate enrollment command is needed. Hardware setup verifies the enrolled key before changing Wi-Fi. After configuration, use Updates → Check now and confirm that signatures are required and the key is enrolled. Existing enrolled devices update normally through the GUI. Unenrolled older installations still use the one-time verified enrollment installer described in [SIGNED-UPDATES.md](SIGNED-UPDATES.md).
 
-## Wi-Fi recovery (0.3.21)
+## Wi-Fi recovery (0.3.22)
 
 The root broker checks recent current-boot driver/control errors every 30 seconds, independently of the receiver app. It ignores ordinary coverage loss and idle APs. Three relevant journal entries within 120 seconds qualify; repeated entries are deduplicated. Startup grace is 90 seconds. Isolated adapter recovery has a five-minute cooldown and three-attempt hourly cap per adapter. Only fresh errors on both adapters after isolated recovery permit a shared supplicant restart (15-minute cooldown, twice per hour), which briefly affects both Wi-Fi paths. No automatic Pi reboot, USB power cycle or driver unload is added. Update and power operations defer recovery. Wi-Fi displays attempt counters and fixed diagnostic reasons; counters/limits reset with the broker process. AP activation is checked independently of the receiver. These mitigations do not establish or fix the underlying driver fault; verify on hardware. An active AP profile still does not prove a phone can associate or obtain DHCP.
+
+## Upstream Wi-Fi recovery (0.3.22)
+
+The connected label requires completed Wi-Fi activation, IPv4 and gateway configuration; it is not an Internet test. Attempts are shown separately and cached status refresh does not force scans. Repeated authentication CONN_FAILED events qualify only for a network previously observed working by the current broker: three events spanning at least 60 seconds within 120 seconds. A new broker starts with no known networks. Unknown networks, explicit wrong-key events and ordinary disconnection do not trigger this detector.
+
+If isolated upstream management recovery does not restore service and qualifying errors continue after five minutes, a targeted USB reset can be attempted. Only the configured upstream MAC on a Linksys AE6000 (USB 13b1:003e) is eligible; other USB Wi-Fi hardware fails closed. The ioctl target is validated as the matching USB character device and cannot be a hub, the SDR or onboard radio. It runs in a child with a 12-second timeout. USB attempts are limited to two per hour with ten minutes between USB attempts, and defer during update/power operations. Limits/counters reset with the broker process. Healthy connectivity resets escalation to management-first. The Wi-Fi page shows USB attempts.
+
+A USB device reset is not a physical power cycle. Linux describes the [USBDEVFS_RESET behavior and synchronization limitations](https://www.kernel.org/doc/html/latest/driver-api/usb/usb.html). Physical replug restored the field device; this software recovery still needs hardware validation. No automatic upstream-fault Pi reboot or USB hub reset is added. Replug the Linksys if software recovery fails.

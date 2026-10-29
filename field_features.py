@@ -532,13 +532,15 @@ def wifi_page():
 <label>Hotspot name<input id="ssid" maxlength="32" autocomplete="off"></label><label>Password<input id="password" type="password" autocomplete="new-password"></label><button id="connect">Connect and save</button>
 <h3>Saved hotspots</h3><div id="saved"></div><p id="message"></p><script>
 const token={{token|tojson}},$=id=>document.getElementById(id);async function call(v){const r=await fetch('/api/wifi',{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':token},body:JSON.stringify(v)});const d=await r.json();if(!r.ok)throw Error(d.error||'Wi-Fi request failed');return d;}
-function showWifiHealth(s){const health=s.recovery||{};$('wifi-recovery').textContent='Wi-Fi recovery: '+(health.state||'unavailable')+' · Adapter attempts: '+(health.adapter_attempts||0)+' · Shared service attempts: '+(health.service_attempts||0)+(health.last_reason?' · '+health.last_reason:'')+(health.last_error?' · '+health.last_error:'');}
-setInterval(async()=>{try{const response=await fetch('/api/status',{cache:'no-store'});const value=await response.json();if(value.ui_wifi&&value.ui_wifi.recovery)showWifiHealth(value.ui_wifi);}catch(e){}},15000);
+function showWifiHealth(s){const health=s.recovery||{};$('wifi-recovery').textContent='Wi-Fi recovery: '+(health.state||'unavailable')+' · Adapter attempts: '+(health.adapter_attempts||0)+' · Upstream USB resets: '+(health.usb_reset_attempts||0)+' · Shared service attempts: '+(health.service_attempts||0)+(health.last_reason?' · '+health.last_reason:'')+(health.last_error?' · '+health.last_error:'');}
+function showWifiStatus(s){if(!s.ap_mac){$('state').textContent=s.note||'Wi-Fi status unavailable';return;}$('adapters').textContent='Onboard AP MAC: '+s.ap_mac+' ('+(s.ap_interface||'missing')+') · Linksys upstream MAC: '+s.client_mac+' ('+(s.client_interface||'unplugged')+')';$('state').textContent='Upload connection: '+(s.hotspot||s.client_note||'offline')+(s.attempted_hotspot?' · Attempting: '+s.attempted_hotspot:'')+' · Onboard AP: '+(s.ap_present?'present':'missing');
+showWifiHealth(s);
+}
+setInterval(async()=>{try{const response=await fetch('/api/status',{cache:'no-store'});const value=await response.json();if(value.ui_wifi)showWifiStatus(value.ui_wifi);}catch(e){}},15000);
 async function load(confirmation='',rescan=true){try{
 $('message').textContent=rescan?'Scanning…':'Updating connection status…';
 const s=await call({action:'status'});
-$('adapters').textContent='Onboard AP MAC: '+s.ap_mac+' ('+(s.ap_interface||'missing')+') · Linksys upstream MAC: '+s.client_mac+' ('+(s.client_interface||'unplugged')+')';$('state').textContent='Upload connection: '+(s.hotspot||'offline')+' · Onboard AP: '+(s.ap_present?'present':'missing');
-showWifiHealth(s);
+showWifiStatus(s);
 const saved=await call({action:'saved'});$('saved').replaceChildren();
 for(const v of saved){
  const row=document.createElement('div'),connect=document.createElement('button'),forget=document.createElement('button');

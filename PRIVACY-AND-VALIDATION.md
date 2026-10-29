@@ -1,6 +1,6 @@
 # Public-release privacy and validation notes
 
-Package: **0.3.21**, prepared 28 October 2026.
+Package: **0.3.22**, prepared 28 October 2026.
 
 ## Privacy changes
 
@@ -31,3 +31,5 @@ The release-signing public key and its fingerprint are intentionally public. Pri
 Retention remains disabled by default. Enabled cleanup deletes eligible active database receptions and linked upload/validation payloads; it does not securely erase SD blocks or purge existing backups, notes or diagnostic logs. Power controls use the existing local-dashboard/CSRF model and a narrow root broker. Keep the dashboard on a trusted network.
 
 Wi-Fi recovery inspects local current-boot journals, but stores/displays only fixed reasons and counters; it does not publish raw journal content. Recovery thresholds are fault evidence, not Internet connectivity or client count. Limits are scoped to the broker lifetime.
+
+Upstream USB recovery in 0.3.22 is restricted to the installing device's configured upstream MAC and the public AE6000 USB model identifiers. No installation MAC, SSID, captured journal or credentials are embedded in distributed source. Locally observed working SSIDs are kept only in broker memory for authentication-failure filtering. No external connectivity probe is added. Hardware effectiveness of USB reset remains unverified.
