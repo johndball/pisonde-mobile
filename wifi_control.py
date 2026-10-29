@@ -116,13 +116,14 @@ def client_link(interface):
         if len(row)==2:data[row[0]]=row[1]
     state=data.get('GENERAL.STATE','');profile=data.get('GENERAL.CONNECTION','')
     if profile=='--':profile=''
-    has_ip=any(k.startswith('IP4.ADDRESS') and v not in ('','--') for k,v in data.items())
+    addresses=[v for k,v in data.items() if k.startswith('IP4.ADDRESS') and v not in ('','--')]
+    has_ip=bool(addresses)
     has_gateway=data.get('IP4.GATEWAY','') not in ('','--')
     associated=state.split(' ',1)[0]=='100'
     connected=associated and has_ip and has_gateway
     note='Associated; waiting for IPv4/gateway' if associated and not connected else ('Connecting to upstream Wi-Fi' if state.split(' ',1)[0] in ('40','50','60','70','80','90') else 'Upstream Wi-Fi disconnected')
     return dict(client_state=state,client_connected=connected,client_note='Associated with IPv4/gateway (Internet unverified)' if connected else note,
-        hotspot=profile if connected else '',attempted_hotspot=profile if not connected else '',client_uuid=data.get('GENERAL.CON-UUID',''),has_ipv4=has_ip,has_gateway=has_gateway)
+        hotspot=profile if connected else '',attempted_hotspot=profile if not connected else '',client_uuid=data.get('GENERAL.CON-UUID',''),has_ipv4=has_ip,has_gateway=has_gateway,client_ipv4=addresses,gateway=data.get('IP4.GATEWAY',''))
 
 
 # Independent broker watchdog: network coverage and client count are not faults.
@@ -134,15 +135,51 @@ WIFI_JOURNAL_REASONS={
               'call-disconnect: failed with Timeout','call-remove-network: failed with Timeout'),
     'ap':('brcmf_cyw_mgmt_tx: TX Auth frame operation is failed',)}
 
+def gateway_health(interface,link):
+    import ipaddress
+    if not interface or not link.get('client_connected'):return 'unavailable'
+    try:
+        gateway=str(ipaddress.IPv4Address(link.get('gateway','')))
+        if ipaddress.IPv4Address(gateway).is_multicast or gateway=='0.0.0.0':return 'unavailable'
+        previous=subprocess.run(['ip','-j','neigh','show','to',gateway,'dev',interface],capture_output=True,text=True,timeout=2)
+        # This stimulates neighbour resolution; it does not test Internet access.
+        subprocess.run(['ping','-n','-I',interface,'-c','1','-W','1',gateway],capture_output=True,timeout=2)
+        result=subprocess.run(['ip','-j','neigh','show','to',gateway,'dev',interface],capture_output=True,text=True,timeout=2)
+        if result.returncode:return 'unavailable'
+        rows=json.loads(result.stdout)
+        states={s for row in rows if row.get('dst')==gateway and row.get('dev')==interface for s in row.get('state',[])}
+        if 'REACHABLE' in states:return 'reachable'
+        if 'FAILED' in states:return 'failed'
+        if previous.returncode==0 and any(row.get('dst')==gateway and row.get('dev')==interface and 'FAILED' in row.get('state',[]) for row in json.loads(previous.stdout)):return 'failed'
+    except (OSError,ValueError,TypeError,subprocess.TimeoutExpired):pass
+    return 'unverified'
+
 class WifiRecovery:
     def __init__(self,clock=time.monotonic):
         self.clock=clock;self.started=clock();self.seen=set();self.events={'ap':collections.deque(maxlen=40),'client':collections.deque(maxlen=40)}
         self.auth=collections.deque(maxlen=40);self.known_networks=set();self.profile_cache={};self.client_stage=False;self.client_connected=False;self.limited=False
         self.attempts={r:collections.deque() for r in ('ap','client','usb','service')}
         self.last_attempt={r:float('-inf') for r in self.attempts}
+        self.gateway_known=set();self.gateway_failures=collections.deque(maxlen=20);self.gateway_key=None;self.link_failed=False;self.gateway_suspect=False
+    def observe_gateway(self,link,health):
+        now=self.clock();key=(link.get('client_uuid'),link.get('gateway'))
+        if key!=self.gateway_key:
+            self.gateway_failures.clear();self.gateway_key=key
+        self.link_failed=False;self.gateway_suspect=False
+        if not link.get('client_connected') or not all(key):
+            self.gateway_failures.clear();return
+        if health=='reachable':
+            self.gateway_known.add(key);self.gateway_failures.clear();return
+        if health!='failed' or key not in self.gateway_known:
+            self.gateway_failures.clear();return
+        self.gateway_suspect=True
+        self.gateway_failures.append(now)
+        self.gateway_failures=collections.deque((t for t in self.gateway_failures if now-t<=150),maxlen=20)
+        self.link_failed=len(self.gateway_failures)>=4 and now-self.gateway_failures[0]>=90
+
     def observe_link(self,link):
         self.client_connected=link.get('client_connected',False)
-        if self.client_connected:
+        if self.client_connected and not self.gateway_suspect:
             ident=link.get('client_uuid','')
             if ident and ident!='--':
                 if ident not in self.profile_cache:self.profile_cache[ident]=nm('-g','802-11-wireless.ssid','connection','show',ident,timeout=4)
@@ -179,7 +216,7 @@ class WifiRecovery:
         for ssid in self.known_networks:
             times=[t for t,name in self.auth if name==ssid]
             if len(times)>=3 and max(times)-min(times)>=60:bad['client']=True
-        if self.client_connected:bad['client']=False
+        if self.client_connected:bad['client']=self.link_failed
         # Shared service restart is last resort: both adapters must have fresh
         # fault evidence, and each must already have had an isolated attempt.
         if ap and client and all(bad.values()) and all(self.attempts[r] for r in ('ap','client')) and now-self.last_attempt['service']>=900 and len(self.attempts['service'])<2:
@@ -195,7 +232,7 @@ class WifiRecovery:
         now=self.clock();self.last_attempt[role]=now;self.attempts[role].append(now)
         if role in ('client','usb'):self.client_stage=True
         for key in self.events:self.events[key].clear()
-        self.auth.clear()
+        self.auth.clear();self.gateway_failures.clear();self.link_failed=False
 
 wifi_recovery=WifiRecovery()
 
@@ -254,11 +291,16 @@ def reconnect_client(interface):
 
 def wifi_health_tick(rows):
     ap=device(AP_MAC);client=device(CLIENT_MAC)
-    try:wifi_recovery.observe_link(client_link(client))
+    try:
+        link=client_link(client)
+        gateway=gateway_health(client,link)
+        WIFI_RECOVERY['gateway_health']=gateway
+        wifi_recovery.observe_gateway(link,gateway)
+        wifi_recovery.observe_link(link)
     except Exception:wifi_recovery.client_connected=False
     wifi_recovery.ingest(rows,ap,client)
     role=wifi_recovery.choose(ap,client)
-    if wifi_recovery.client_connected:WIFI_RECOVERY['last_error']=''
+    if wifi_recovery.client_connected and not wifi_recovery.link_failed:WIFI_RECOVERY['last_error']=''
     if role is None:
         WIFI_RECOVERY['state']='Recovery cooldown/limit active; inspect or replug Linksys if persistent' if wifi_recovery.limited else 'Monitoring (90-second startup grace)' if wifi_recovery.clock()-wifi_recovery.started<90 else 'Monitoring'
         return
@@ -269,22 +311,39 @@ def wifi_health_tick(rows):
             state=updater.status()
             if updater.power_pending() or (updater.STATE/'pending.json').exists() or (state.get('phase')=='Queued' and not state.get('completed_at')):
                 WIFI_RECOVERY['state']='Deferred for update/power operation';return
+            stalled=wifi_recovery.link_failed
             wifi_recovery.record(role)
             reason='Both adapters repeatedly failing after isolated recovery' if role=='service' else ('Repeated onboard authentication failures' if role=='ap' else ('Persistent upstream failure after adapter management recovery' if role=='usb' else 'Repeated upstream Wi-Fi control/authentication failures'))
+            if stalled:reason='Persistent local gateway ARP failure on previously working upstream'
             counter='service_attempts' if role=='service' else 'adapter_attempts'
             WIFI_RECOVERY.update(state='Recovering '+role,last_reason=reason,last_error='')
             WIFI_RECOVERY[counter]+=1
             logging.warning('Wi-Fi recovery: %s',reason)
+            recovery_record('attempt')
             try:recover_wifi(role)
             except Exception:
                 WIFI_RECOVERY.update(state='Recovery attempted; inspect connectivity',last_error='Recovery did not complete; bounded retry applies')
                 logging.warning('Wi-Fi recovery operation did not complete')
             else:WIFI_RECOVERY['state']='Recovery attempted; monitoring'
+            recovery_record('attempt_finished')
     except RuntimeError:
         WIFI_RECOVERY['state']='Deferred; update lock unavailable'
     finally:operation_lock.release()
 
+def recovery_record(event):
+    import update_manager as updater
+    try:
+        path=updater.STATE/'wifi-recovery.json'
+        history=updater.read(path,{}).get('events',[])
+        if not isinstance(history,list):history=[]
+        item=dict(event=event,epoch=time.time(),boot_id=updater.boot_id(),
+            state=WIFI_RECOVERY['state'],reason=WIFI_RECOVERY['last_reason'],error=WIFI_RECOVERY['last_error'],
+            adapter_attempts=WIFI_RECOVERY['adapter_attempts'],usb_reset_attempts=WIFI_RECOVERY['usb_reset_attempts'])
+        updater.put(path,dict(events=(history+[item])[-60:]))
+    except Exception:logging.warning('Wi-Fi recovery history write failed')
+
 def wifi_health_watch():
+    recovery_record('broker_started')
     # Do not replay previous-boot or pre-start errors after an app update.
     since=time.time()
     while True:
@@ -319,7 +378,12 @@ def status():
     result=dict(ap_mac=AP_MAC,client_mac=CLIENT_MAC,ap_interface=ap,client_interface=client,onboard_present=bool(ap),usb_present=bool(client),role_layout=ROLE_LAYOUT,ap_present=bool(ap),hotspot='',client_state='',ap_state='',recovery=dict(WIFI_RECOVERY))
     try:result.update(client_link(client))
     except Exception:result.update(client_connected=False,client_note='Upstream status unavailable',attempted_hotspot='')
-    if ap:result['ap_state']=nm('-g','GENERAL.STATE','device','show',ap)
+    result.setdefault('client_ipv4',[])
+    result['ap_ipv4']=[]
+    if ap:
+        result['ap_state']=nm('-g','GENERAL.STATE','device','show',ap)
+        try:result['ap_ipv4']=[v for v in nm('-g','IP4.ADDRESS','device','show',ap).splitlines() if v not in ('','--')]
+        except Exception:pass
     return result
 
 FORGOTTEN=Path('/var/lib/pisonde-mobile/forgotten-wifi.json')
@@ -476,8 +540,8 @@ if __name__=='__main__':
         print(json.dumps(reset_client_usb()));raise SystemExit(0)
     # Update timer migrations must not prevent field Wi-Fi control starting.
     try:
-        from update_manager import ensure_support
-        ensure_support()
+        from update_manager import request_support
+        request_support()
     except Exception as exc:
         import logging
         logging.error('Updater timer setup failed: %s',exc)

@@ -1,6 +1,6 @@
 # Automatic application updates
 
-PiSonde Mobile 0.3.22 uses an Updates page and a root-owned systemd worker. No GitHub token is needed for this public repository.
+PiSonde Mobile 0.3.23 uses an Updates page and a root-owned systemd worker. No GitHub token is needed for this public repository.
 
 ## Fresh installations
 
@@ -55,7 +55,7 @@ systemctl list-timers pisonde-update.timer --no-pager
 sudo journalctl -u pisonde-update-run.service -u pisonde-update-install.service -n 40 --no-pager
 ```
 
-Confirm **0.3.22** on the dashboard, the Updates controls match your chosen policy, and sample flow/reception resumes. Select **Check now** and confirm **Up to date**. Reboot during a convenient maintenance period and confirm the AP and receiver return. Hardware installation is not verified until these device-side checks succeed.
+Confirm **0.3.23** on the dashboard, the Updates controls match your chosen policy, and sample flow/reception resumes. Select **Check now** and confirm **Up to date**. Reboot during a convenient maintenance period and confirm the AP and receiver return. Hardware installation is not verified until these device-side checks succeed.
 
 All web-changing actions require the existing CSRF token and go through a narrow root broker with fixed operation names. The local dashboard uses HTTP: keep it on a trusted network and do not expose it directly to the Internet.
 
@@ -64,3 +64,7 @@ All web-changing actions require the existing CSRF token and go through a narrow
 Read [CHANGELOG.md](CHANGELOG.md) or the repository's GitHub Releases page. Tags/Releases document tested source snapshots; they do not independently change the device's stable channel. A repository workflow publishes the reviewed version catalog under `releases/` and refuses to move an existing version tag.
 
 GUI restart/shutdown requests are rejected while an update is running, queued or awaiting interrupted-update recovery. Updates are refused while a power action is pending. These interlocks apply to GUI/broker actions; an administrator or physical power removal can still interrupt a device.
+
+## Support migration (0.3.23)
+
+The Wi-Fi broker requests a fixed transient support worker from systemd rather than writing /etc itself. The worker checks update/power interlocks and applies timer setup outside the broker's read-only namespace. Scheduled/manual update workers also check support setup. Broker protection is not relaxed.

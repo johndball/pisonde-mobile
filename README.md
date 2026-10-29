@@ -2,7 +2,7 @@
 
 A Raspberry Pi field receiver for amateur balloon and weather-sonde recovery: sequential SDR scanning, a simple phone dashboard, and durable local coordinates when recovery has to wait.
 
-**Application: 0.3.22 · Signed application updates**
+**Application: 0.3.23 · Signed application updates**
 
 Fresh installs of 0.3.16 automatically verify the signed release and enroll its public key during setup. Existing enrolled devices update through the GUI. Older unenrolled devices still need one-time [signed-update enrollment](SIGNED-UPDATES.md). Source commits alone do not deploy updates; publisher signature and signed-channel publication are required.
 
@@ -80,7 +80,7 @@ Read [CHANGELOG.md](CHANGELOG.md) for the version history and [GitHub Releases](
 
 ## Background updates
 
-Version 0.3.22 retains three independent automatic-install options: a selectable two-hour maintenance window in 24-hour local time, installation at the next reboot after a missed window, and immediate installation when a new version is detected. Checks run about every six hours. Defaults preserve scheduled 0300–0500 installation; the other options start off. Manual checks and installation remain available. Updates use a curated stable manifest pinned to immutable source commits, preserve local configuration/history and attempt rollback on failure.
+Version 0.3.23 retains three independent automatic-install options: a selectable two-hour maintenance window in 24-hour local time, installation at the next reboot after a missed window, and immediate installation when a new version is detected. Checks run about every six hours. Defaults preserve scheduled 0300–0500 installation; the other options start off. Manual checks and installation remain available. Updates use a curated stable manifest pinned to immutable source commits, preserve local configuration/history and attempt rollback on failure.
 
 For an existing device, follow the [one-time updater setup](UPDATES.md). New installations configure update support during initial hardware setup. Application updates do not install OS/dependency changes or database migrations.
 
@@ -137,10 +137,20 @@ Under **Device controls → SDR recovery**, enable **Reboot PiSonde if SDR recov
 
 Automatic recovery allows at most one reboot per hour, with the last attempt persisted across boots. The trigger is a sample-output/pipeline fault, not an absence of decoded packets. Rebooting may recover the receiver, but the underlying hardware/driver stall still requires field investigation.
 
-## Upstream Wi-Fi recovery (0.3.22)
+## Upstream Wi-Fi recovery (0.3.23)
 
 The connected label requires completed Wi-Fi activation, IPv4 and gateway configuration; it is not an Internet test. Attempts are shown separately and cached status refresh does not force scans. Repeated authentication CONN_FAILED events qualify only for a network previously observed working by the current broker: three events spanning at least 60 seconds within 120 seconds. A new broker starts with no known networks. Unknown networks, explicit wrong-key events and ordinary disconnection do not trigger this detector.
 
 If isolated upstream management recovery does not restore service and qualifying errors continue after five minutes, a targeted USB reset can be attempted. Only the configured upstream MAC on a Linksys AE6000 (USB 13b1:003e) is eligible; other USB Wi-Fi hardware fails closed. The ioctl target is validated as the matching USB character device and cannot be a hub, the SDR or onboard radio. It runs in a child with a 12-second timeout. USB attempts are limited to two per hour with ten minutes between USB attempts, and defer during update/power operations. Limits/counters reset with the broker process. Healthy connectivity resets escalation to management-first. The Wi-Fi page shows USB attempts.
 
 A USB device reset is not a physical power cycle. Linux describes the [USBDEVFS_RESET behavior and synchronization limitations](https://www.kernel.org/doc/html/latest/driver-api/usb/usb.html). Physical replug restored the field device; this software recovery still needs hardware validation. No automatic upstream-fault Pi reboot or USB hub reset is added. Replug the Linksys if software recovery fails.
+
+## Dashboard health and upstream diagnostics (0.3.23)
+
+The main header has one plain-text row, with no panel: CPU utilization, CPU temperature in °C/°F, free disk GiB/percentage and power/throttling flags. CPU utilization is calculated from successive /proc/stat samples; its first sample is unavailable. Hardware reads run every five seconds in a background thread. Cached data older than 20 seconds is discarded. Temperature comes from the Pi CPU sensor, not ambient air. Battery and USB input voltage show N/A; core voltage is not a substitute for the USB supply voltage. Power OK means no firmware warning flags, not a calibrated USB power measurement.
+
+The Wi-Fi page shows live IPv4/CIDR values under each runtime MAC/interface, or No IPv4 address. Recovery also watches the configured local gateway's ARP state every approximately 30 seconds. A ping only stimulates neighbour resolution: its return code does not trigger recovery. Four FAILED observations spanning 90 seconds within 150 seconds qualify only after the same profile/gateway was observed REACHABLE by this broker. STALE/INCOMPLETE entries, missing coverage, an unknown gateway and remote Internet failures do not qualify. A local gateway outage can qualify too; this detector cannot prove the adapter is the cause. Existing recovery limits and AP role protections remain.
+
+Recovery/startup history retains the last 60 records in /var/lib/pisonde-updater/wifi-recovery.json. It contains fixed diagnostic fields and boot IDs; no raw logs, SSIDs, MACs or credentials. Runtime counters/rate limits still reset with the broker. A USB device reset may not recover a fault requiring actual power removal. Replug the Linksys if needed; do not power-cycle the shared hub automatically.
+
+Updater support migrations now run outside the broker's read-only /etc namespace through a fixed systemd worker. The broker retains ProtectSystem=full. The next normal update worker also checks for a pending migration. Existing installations need iproute2 and iputils-ping for the new local-link probe; missing commands produce an unavailable check, never a reset. Fresh installs explicitly install both packages. No new production dependency is downloaded by an application-only update.

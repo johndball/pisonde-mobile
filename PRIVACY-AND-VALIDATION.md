@@ -1,6 +1,6 @@
 # Public-release privacy and validation notes
 
-Package: **0.3.22**, prepared 28 October 2026.
+Package: **0.3.23**, prepared 29 October 2026.
 
 ## Privacy changes
 
@@ -32,4 +32,6 @@ Retention remains disabled by default. Enabled cleanup deletes eligible active d
 
 Wi-Fi recovery inspects local current-boot journals, but stores/displays only fixed reasons and counters; it does not publish raw journal content. Recovery thresholds are fault evidence, not Internet connectivity or client count. Limits are scoped to the broker lifetime.
 
-Upstream USB recovery in 0.3.22 is restricted to the installing device's configured upstream MAC and the public AE6000 USB model identifiers. No installation MAC, SSID, captured journal or credentials are embedded in distributed source. Locally observed working SSIDs are kept only in broker memory for authentication-failure filtering. No external connectivity probe is added. Hardware effectiveness of USB reset remains unverified.
+Upstream USB recovery in 0.3.23 is restricted to the installing device's configured upstream MAC and the public AE6000 USB model identifiers. No installation MAC, SSID, captured journal or credentials are embedded in distributed source. Locally observed working SSIDs are kept only in broker memory for authentication-failure filtering. No external connectivity probe is added. Hardware effectiveness of USB reset remains unverified.
+
+0.3.23 adds a local-gateway-only neighbour probe; it does not contact external connectivity-test services. Recovery history holds at most 60 fixed records under the root-owned updater state directory. Runtime IP/MAC data is local dashboard information, not public source. CPU/temperature/power reads use bounded background sampling and do not provide calibrated USB supply or battery measurements.

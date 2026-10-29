@@ -2,6 +2,15 @@
 
 Application versions, stable-channel deployments and GitHub Releases are related but distinct. An enrolled device installs only the immutable source snapshot authenticated by `updates/signed-stable.json` (legacy devices use `updates/stable.json`); publishing a tag alone does not deploy code. GitHub Releases are available from the repository's Releases page.
 
+## 0.3.23 — pending publisher signature
+
+- Add one plain-text header health row with CPU utilization, CPU temperature (°C/°F), disk free space/percentage and undervoltage/throttling flags. Sample in the background; unsupported battery/input-voltage readings show N/A.
+- Display dynamic adapter IPv4 addresses beneath their MAC/interface lines on Wi-Fi.
+- Detect sustained local gateway ARP failure on a previously working upstream profile/gateway even when IPv4 configuration remains. Ignore blocked ICMP alone and unverified/stale neighbour entries. Preserve bounded management-first/USB escalation and update/power interlocks.
+- Retain 60 fixed recovery/startup records across restarts, without publishing local network identities or raw logs. Do not claim these records diagnose unexplained Pi restarts.
+- Move updater support migration out of the restricted Wi-Fi broker into a fixed systemd-launched worker, retaining broker filesystem protection.
+- Keep automatic deployment on 0.3.22 until the publisher signs this candidate. Live Linksys recovery effectiveness still requires hardware validation.
+
 ## 0.3.22 — 2026-10-28
 
 - Show upstream profile names as connected only after completed Wi-Fi activation, IPv4 and gateway configuration. Label attempts/waiting states and poll cached Wi-Fi status without triggering scans.

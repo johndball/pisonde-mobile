@@ -16,7 +16,7 @@ apt-get update
 apt-get install -y python3 openssl ca-certificates
 # Verify the publisher signature and application bytes before installing them.
 python3 "$SOURCE/fresh_install.py" preflight "$SOURCE" "$WORK/release.json"
-apt-get install -y python3-venv python3-dev git build-essential pkg-config libffi-dev libusb-1.0-0-dev librtlsdr-dev rtl-sdr usbutils sox direwolf network-manager ethtool iw libfftw3-dev
+apt-get install -y python3-venv python3-dev git build-essential pkg-config libffi-dev libusb-1.0-0-dev librtlsdr-dev rtl-sdr usbutils sox direwolf network-manager ethtool iw iproute2 iputils-ping libfftw3-dev
 getent group plugdev >/dev/null || groupadd --system plugdev
 id pisonde-mobile >/dev/null 2>&1 || useradd --system --user-group --home-dir /var/lib/pisonde-mobile --shell /usr/sbin/nologin pisonde-mobile
 usermod -a -G plugdev pisonde-mobile
@@ -72,7 +72,7 @@ install -m 0644 "$SOURCE"/systemd/* /etc/systemd/system/
 systemctl daemon-reload
 "$DEST/venv/bin/python" -m pip freeze > "$DEST/installed-python-versions.txt"
 python3 "$SOURCE/fresh_install.py" enroll "$SOURCE" "$WORK/release.json"
-echo 'Installed signed PiSonde Mobile 0.3.22. Services are not started yet.'
+echo 'Installed signed PiSonde Mobile 0.3.23. Services are not started yet.'
 echo 'Public key enrolled automatically; no separate enrollment command is needed.' 
 echo 'Reboot to release the TV driver, then use Ethernet or a local console:'
 echo 'sudo python3 /opt/pisonde-mobile/configure.py'

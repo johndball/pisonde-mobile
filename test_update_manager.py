@@ -239,6 +239,17 @@ class UpdateTests(unittest.TestCase):
         u.put(u.STATE/'available.json',self.value);u.update_status(last_check=u.now())
         with patch.object(u,'command'),patch.object(u,'catalog') as catalog,patch.object(u,'stage') as stage:u.run('run')
         catalog.assert_not_called();stage.assert_not_called()
+    def test_support_request_launches_fixed_worker_outside_broker(self):
+        u.put(u.STATE/'settings.json',dict(u.DEFAULT))
+        with patch.object(u,'command') as command,patch.object(u,'install_support') as install:
+            u.request_support();install.assert_not_called()
+            command.assert_called_once_with(['/usr/bin/systemd-run','--collect','--no-block','--unit=pisonde-update-support','/usr/bin/python3',str(u.APP/'update_manager.py'),'support'])
+            command.reset_mock();u.put(u.STATE/'support.json',dict(version=u.UPDATER_VERSION));u.request_support();command.assert_not_called()
+    def test_support_worker_defers_during_pending_transaction(self):
+        with patch.object(u.sys,'argv',['update_manager.py','support']),patch.object(u.os,'geteuid',return_value=0),patch.object(u,'power_pending',return_value=False),patch.object(u,'ensure_support') as ensure:
+            u.put(u.STATE/'pending.json',{});u.main();ensure.assert_not_called()
+            (u.STATE/'pending.json').unlink();u.main();ensure.assert_called_once()
+
     def test_support_migrates_old_timer_once(self):
         u.put(u.STATE/'settings.json',dict(automatic=False,window_start=3,window_end=5))
         with patch.object(u,'install_support') as support:

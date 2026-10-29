@@ -50,6 +50,10 @@
   },
   {
     "tag": "v0.3.22",
+    "commit": "5cde37eb193ae6881ae217b800619457719cd9ea"
+  },
+  {
+    "tag": "v0.3.23",
     "commit": "signed-stable"
   }
 ]

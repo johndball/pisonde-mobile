@@ -15,6 +15,35 @@ class GuiTests(unittest.TestCase):
    cursor=db.execute('INSERT INTO receptions(received_utc,protocol,frequency_mhz,callsign,latitude,longitude,altitude_m,raw_packet) VALUES(?,?,?,?,?,?,?,?)',(when,protocol,403. if protocol=='RS41' else 144.39,call,lat,lon,9500.,'{"frame":"test"}'))
    return cursor.lastrowid
  def status(self):return self.client.get('/api/status').json
+ def test_health_row_is_plain_text_under_header_and_formats_units(self):
+  import re,subprocess,shutil
+  page=self.client.get('/').text
+  self.assertIn('</header><div id="device-health" class="muted"',page)
+  self.assertIn('healthText(s.ui_health||{})',page)
+  if shutil.which('node'):
+   function=re.search(r'function healthText\(h\)\{.*?\n\}',page,re.S).group()
+   script=function+';console.log(healthText({cpu_percent:12,temp_c:50,disk_free_gib:100,disk_free_percent:88,power:"OK"}));console.log(healthText({}));'
+   lines=subprocess.run(['node','-e',script],capture_output=True,text=True,check=True).stdout.splitlines()
+   self.assertIn('Temp: 50°C / 122.0°F',lines[0]);self.assertIn('CPU: 12%',lines[0]);self.assertIn('Input voltage: N/A',lines[0]);self.assertIn('CPU: N/A',lines[1])
+ def test_health_sampler_uses_cpu_deltas_temperature_and_power_flags(self):
+  from types import SimpleNamespace
+  proc=Path(self.tmp.name)/'stat';temp=Path(self.tmp.name)/'temp';temp.write_text('54500')
+  proc.write_text('cpu 10 0 10 80 0 0 0 0\n');self.u.health_cpu=None
+  with patch('subprocess.run',return_value=SimpleNamespace(returncode=0,stdout='throttled=0x10001')):
+   first=self.u.sample_health(proc,temp);self.assertIsNone(first['cpu_percent'])
+   proc.write_text('cpu 20 0 20 160 0 0 0 0\n');second=self.u.sample_health(proc,temp)
+  self.assertEqual(second['cpu_percent'],20);self.assertEqual(second['temp_c'],54.5);self.assertEqual(second['power'],'Undervoltage');self.assertGreater(second['disk_free_gib'],0)
+  self.assertEqual(second['battery'],'N/A');self.assertEqual(second['input_voltage'],'N/A')
+ def test_health_api_rejects_stale_cache(self):
+  import time
+  self.u.health_state=dict(checked_at=time.monotonic(),temp_c=50)
+  self.assertEqual(self.status()['ui_health']['temp_c'],50)
+  self.u.health_state['checked_at']-=30;self.assertEqual(self.status()['ui_health'],{})
+ def test_adapter_ips_are_under_mac_lines(self):
+  page=self.client.get('/wifi').text
+  self.assertIn('Onboard AP IP:',page);self.assertIn('Linksys upstream IP:',page)
+  self.assertIn('No IPv4 address',page);self.assertIn('white-space:pre-line',page)
+
  def test_latest_position_is_kept_when_newest_packet_has_no_coordinates(self):
   pos=self.add();last=self.add(lat=None,lon=None);s=self.status();self.assertEqual(len(s['ui_targets']),1);self.assertEqual(s['ui_targets'][0]['id'],pos);self.assertEqual(s['ui_targets'][0]['last_id'],last)
  def test_earlier_history_and_incremental_updates(self):
@@ -38,7 +67,7 @@ class GuiTests(unittest.TestCase):
   for path in ['/','/help','/sondehub-approval','/wifi','/history','/uploads','/weather-validation.jsonl?type=RS41','/upload-report.json']:
    self.assertEqual(self.client.get(path).status_code,200,path)
   self.assertEqual(self.client.post('/api/control',json={'profile':'STOP'}).status_code,403)
-  page=self.client.get('/').text;self.assertIn('v0.3.22',page);self.assertIn('id="upload-status"',page);self.assertNotIn('Auto: resume searching',page)
+  page=self.client.get('/').text;self.assertIn('v0.3.23',page);self.assertIn('id="upload-status"',page);self.assertNotIn('Auto: resume searching',page)
  def test_status_reads_do_not_touch_stored_history(self):
   self.add();before=self.m.DB.read_bytes();self.status();self.status()
   with self.m.database() as db:self.assertEqual(db.execute('SELECT COUNT(*) FROM receptions').fetchone()[0],1)
@@ -50,7 +79,7 @@ class GuiTests(unittest.TestCase):
   self.assertIn('href="/updates"',self.client.get('/').text)
   self.assertEqual(self.client.post('/api/updates',json={'operation':'install'}).status_code,403)
   with self.client.session_transaction() as session:token=session['token']
-  with patch.object(self.f,'broker',return_value={'automatic':False,'installed_version':'0.3.22'}) as broker:
+  with patch.object(self.f,'broker',return_value={'automatic':False,'installed_version':'0.3.23'}) as broker:
    response=self.client.post('/api/updates',json={'operation':'set_auto','enabled':False},headers={'X-CSRF-Token':token})
    self.assertEqual(response.status_code,200);broker.assert_called_once_with('update',operation='set_auto',enabled=False)
 

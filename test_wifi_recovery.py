@@ -14,6 +14,59 @@ class WifiRecoveryTests(unittest.TestCase):
         self.clock=[0.];self.r=self.w.WifiRecovery(clock=lambda:self.clock[0]);self.clock[0]=100.
         self.tmp=tempfile.TemporaryDirectory();self.addCleanup(self.tmp.cleanup)
         mock=patch.object(updater,'STATE',Path(self.tmp.name));mock.start();self.addCleanup(mock.stop)
+    def test_gateway_stall_requires_known_gateway_and_ninety_seconds(self):
+        link=dict(client_connected=True,client_uuid='saved',gateway='192.0.2.1')
+        with patch.object(self.w,'nm',return_value='Field hotspot'):
+            for t in (100,130,160,190):
+                self.clock[0]=t;self.r.observe_gateway(link,'failed');self.r.observe_link(link)
+            self.assertIsNone(self.r.choose('wlan0','wlan1'))
+            self.r.observe_gateway(link,'reachable')
+            for t in (200,230,260):
+                self.clock[0]=t;self.r.observe_gateway(link,'failed');self.r.observe_link(link)
+                self.assertIsNone(self.r.choose('wlan0','wlan1'))
+            self.clock[0]=290;self.r.observe_gateway(link,'failed');self.r.observe_link(link)
+            self.assertEqual(self.r.choose('wlan0','wlan1'),'client');self.r.record('client')
+            for t in range(320,591,30):
+                self.clock[0]=t;self.r.observe_gateway(link,'failed');self.r.observe_link(link)
+            self.assertEqual(self.r.choose('wlan0','wlan1'),'usb')
+            self.r.observe_gateway(link,'reachable');self.r.observe_link(link)
+            self.assertFalse(self.r.client_stage);self.assertIsNone(self.r.choose('wlan0','wlan1'))
+    def test_gateway_unknown_stale_and_coverage_loss_do_not_trigger(self):
+        link=dict(client_connected=True,client_uuid='saved',gateway='192.0.2.1')
+        self.r.observe_gateway(link,'reachable')
+        for health in ('unverified','unavailable'):
+            for t in (200,230,260,290):
+                self.clock[0]=t;self.r.observe_gateway(link,health)
+                self.assertFalse(self.r.link_failed)
+        link['client_connected']=False
+        self.r.observe_gateway(link,'failed');self.assertFalse(self.r.link_failed)
+        link.update(client_connected=True,gateway='192.0.2.2')
+        for t in (300,330,360,390):
+            self.clock[0]=t;self.r.observe_gateway(link,'failed');self.assertFalse(self.r.link_failed)
+    def test_blocked_ping_with_reachable_arp_is_healthy(self):
+        row=json.dumps([dict(dst='192.0.2.1',dev='wlan1',state=['REACHABLE'])])
+        def run(args,**kwargs):return SimpleNamespace(returncode=1 if args[0]=='ping' else 0,stdout=row)
+        with patch.object(self.w.subprocess,'run',side_effect=run) as command:
+            self.assertEqual(self.w.gateway_health('wlan1',dict(client_connected=True,gateway='192.0.2.1')),'reachable')
+        self.assertTrue(all(c.kwargs['timeout']<=2 for c in command.call_args_list))
+    def test_failed_arp_not_ping_failure_is_required(self):
+        link=dict(client_connected=True,gateway='192.0.2.1')
+        for state,expected in (('FAILED','failed'),('STALE','unverified'),('INCOMPLETE','unverified')):
+            row=json.dumps([dict(dst='192.0.2.1',dev='wlan1',state=[state])])
+            with patch.object(self.w.subprocess,'run',return_value=SimpleNamespace(returncode=0,stdout=row)):
+                self.assertEqual(self.w.gateway_health('wlan1',link),expected)
+        with patch.object(self.w.subprocess,'run') as run:
+            self.assertEqual(self.w.gateway_health('wlan1',dict(client_connected=False)),'unavailable');run.assert_not_called()
+    def test_recovery_history_is_bounded_and_survives_broker_restart(self):
+        with patch.object(updater,'boot_id',return_value='test-boot'):
+            for _ in range(65):self.w.recovery_record('attempt')
+            data=updater.read(updater.STATE/'wifi-recovery.json')
+            self.assertEqual(len(data['events']),60)
+            self.assertEqual(data['events'][-1]['boot_id'],'test-boot')
+            self.assertNotIn('ssid',json.dumps(data));self.assertNotIn(self.w.CLIENT_MAC,json.dumps(data))
+            self.w.recovery_record('broker_started')
+            self.assertEqual(updater.read(updater.STATE/'wifi-recovery.json')['events'][-1]['event'],'broker_started')
+
     def faults(self,role,start=0):
         return [dict(__CURSOR=role+str(start+i),MESSAGE=('brcmf_cyw_mgmt_tx: TX Auth frame operation is failed: status=10' if role=='ap' else 'device (wlan1): request-scan: could not get scan request result: Timeout was reached'),_SYSTEMD_UNIT='NetworkManager.service',_TRANSPORT='kernel' if role=='ap' else 'journal') for i in range(3)]
     def feed(self,role,start=0):self.r.ingest(self.faults(role,start),'wlan0','wlan1')

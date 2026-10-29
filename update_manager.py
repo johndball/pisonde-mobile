@@ -12,7 +12,7 @@ HARDWARE=Path('/etc/pisonde-mobile/hardware.json')
 RAW='https://raw.githubusercontent.com/johndball/pisonde-mobile/'
 API='https://api.github.com/repos/johndball/pisonde-mobile/'
 CHANNEL=API+'contents/updates/signed-stable.json?ref=main'
-UPDATER_VERSION='0.3.22'
+UPDATER_VERSION='0.3.23'
 FILES={'mobile.py','field_features.py','field_ui.py','wifi_control.py','sdr_health.py','hardware.py','storage_maintenance.py','verify_recovery.py','update_manager.py','update_ui.py'}
 TRUST=Path('/etc/pisonde-mobile/update-signing-public.pem')
 ENROLL_FINGERPRINT='34e43261378f0235107cc0d1e3eb8d2bed7d44c44d995323d7646203235dbfd0'
@@ -312,6 +312,7 @@ def run(action):
         raise
     with locked():
         if power_pending():raise RuntimeError('Device restart/shutdown is pending')
+        ensure_support()
         current=read(STATE/'status.json',{})
         ident=current.get('operation_id') if current.get('phase')=='Queued' and current.get('operation')==action else uuid.uuid4().hex
         update_status(operation_id=ident,operation=action,started_at=now(),completed_at=None,outcome=None,phase='Checking',last_error='',last_result='')
@@ -435,9 +436,16 @@ WantedBy=timers.target
     if start_timer:command(['systemctl','restart','pisonde-update.timer'])
     put(STATE/'support.json',{'version':UPDATER_VERSION})
 
+def request_support():
+    # The broker has a read-only /etc namespace. PID 1 launches this fixed
+    # worker in a separate service context; never relax the broker sandbox.
+    if (STATE/'settings.json').exists() and read(STATE/'support.json',{}).get('version')!=UPDATER_VERSION:
+        command(['/usr/bin/systemd-run','--collect','--no-block','--unit=pisonde-update-support',
+                 '/usr/bin/python3',str(APP/'update_manager.py'),'support'])
+
 def ensure_support():
     # The old updater installs application files only. Migrate its timer once from
-    # the newly restarted root broker, without requiring a separate SSH command.
+    # a dedicated root worker, without requiring a separate SSH command.
     if (STATE/'settings.json').exists() and read(STATE/'support.json',{}).get('version')!=UPDATER_VERSION:
         install_support()
 
@@ -523,6 +531,10 @@ def main():
     action=sys.argv[1] if len(sys.argv) in (2,3) else ''
     if action=='bootstrap':return bootstrap(read(Path(sys.argv[2])) if len(sys.argv)==3 else None)
     if len(sys.argv)!=2:raise RuntimeError('Invalid updater arguments')
+    if action=='support':
+        with locked():
+            if power_pending() or (STATE/'pending.json').exists():return
+            return ensure_support()
     if action=='recover':
         with locked():return recover()
     return run(action)
