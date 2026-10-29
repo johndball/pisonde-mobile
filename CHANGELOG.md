@@ -2,7 +2,7 @@
 
 Application versions, stable-channel deployments and GitHub Releases are related but distinct. An enrolled device installs only the immutable source snapshot authenticated by `updates/signed-stable.json` (legacy devices use `updates/stable.json`); publishing a tag alone does not deploy code. GitHub Releases are available from the repository's Releases page.
 
-## 0.3.22 — pending publisher signature
+## 0.3.22 — 2026-10-28
 
 - Show upstream profile names as connected only after completed Wi-Fi activation, IPv4 and gateway configuration. Label attempts/waiting states and poll cached Wi-Fi status without triggering scans.
 - Detect three CONN_FAILED authentication events spanning at least 60 seconds within 120 seconds for a network observed working by this broker. Ignore unknown networks, wrong-key events, ordinary coverage loss and idle APs.
