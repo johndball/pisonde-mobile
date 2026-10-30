@@ -2,7 +2,7 @@
 
 Application versions, stable-channel deployments and GitHub Releases are related but distinct. An enrolled device installs only the immutable source snapshot authenticated by `updates/signed-stable.json` (legacy devices use `updates/stable.json`); publishing a tag alone does not deploy code. GitHub Releases are available from the repository's Releases page.
 
-## 0.3.23 — pending publisher signature
+## 0.3.23 — 2026-10-30
 
 - Add one plain-text header health row with CPU utilization, CPU temperature (°C/°F), disk free space/percentage and undervoltage/throttling flags. Sample in the background; unsupported battery/input-voltage readings show N/A.
 - Display dynamic adapter IPv4 addresses beneath their MAC/interface lines on Wi-Fi.

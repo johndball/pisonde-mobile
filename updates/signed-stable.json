@@ -1,30 +1,30 @@
 {
   "schema": 2,
   "compatibility": "app-only-v1",
-  "version": "0.3.22",
-  "commit": "5cde37eb193ae6881ae217b800619457719cd9ea",
+  "version": "0.3.23",
+  "commit": "cf16a08e1d86300850c9a57f5c95ec6451a33b9c",
   "files": {
-    "field_features.py": "dbae491a6a240026306604d3baf1209f787c4afe4236f0da48e68917ad86b60a",
-    "field_ui.py": "608c931b6621eb5f3ec85e837befc708bc75fa78369006c3a9bf4c773a947e4b",
+    "field_features.py": "db119ef3abd760945aa8dc7570f07404462033cc24430afec7ce78ee7bc6fdf7",
+    "field_ui.py": "a9150a3b9de92861055a7a89494d0c6bc84a31dcd4c3970e5e71fbbf85998c2c",
     "hardware.py": "a36d90e32e93e20aeb6a0db245b0dfc4b3619da535f3e61aee360627262274de",
-    "mobile.py": "d4c8a0fcbd5635c41f02c167edc48250b1ec8db1b3750b590c454a079f9af0d2",
+    "mobile.py": "af5b0b47ea3c222a5ce2f5ccb72ed5b22980e29d0fcdcad220e81d7c0e696cac",
     "sdr_health.py": "9f4de3748c60439b9bb7580ab9c600500cee0472a47916b71da017b8f1186bc4",
     "storage_maintenance.py": "2dc51f72f7506fc8902c657d0f44a83a4129669092af6a9455147ea781253fa5",
-    "update_manager.py": "bc3def54478e1bb5f5201d7c965977b9d6981f02619c96bdc7eee8ccb0d17348",
+    "update_manager.py": "ab8548074a60cd8eb1821e9a82890b712333791b520d70ffe145a0a686801f53",
     "update_ui.py": "a4e38d0e9caad3adcbed092fe1cc5ecc2dce41ec5379e0e54b6ca6c9fa0e66f1",
-    "verify_recovery.py": "43ad17c6e2ff249f26cb6826df35d92748bd7dd8fc2ff8cdc462dbb248838cb3",
-    "wifi_control.py": "3aac8aba8f6e717b4ba084377fc1836c30e616e661e291e2814e2b391a9e5895"
+    "verify_recovery.py": "d9228dbe8c12d9374b603d6429ff52f6da81d5ec7ae98329134065b636a4ebb4",
+    "wifi_control.py": "11b93b2a8041f1444f67ea87a21f3b2992d2e936af488aaab886455cf473fe53"
   },
   "security": {
     "repository": "johndball/pisonde-mobile",
     "channel": "signed-stable",
-    "sequence": 8,
-    "issued_at": "2026-10-29T01:26:36Z",
-    "expires_at": "2027-01-27T01:26:36Z"
+    "sequence": 9,
+    "issued_at": "2026-10-30T10:11:42Z",
+    "expires_at": "2027-01-28T10:11:42Z"
   },
   "signature": {
     "algorithm": "ed25519",
     "key_id": "34e43261378f0235107cc0d1e3eb8d2bed7d44c44d995323d7646203235dbfd0",
-    "value": "mdrPiRhMYF+52932dPtNdFew24IjMy2e8pgga7fvTmO6BlGXFjssyU2QCHiqI2a6lX4yVzcKfGpyUuCsveGZBQ=="
+    "value": "492/iDmLZhQhwUvkweb1sCg8NKbzYMHTsvoeZlrpO5zk3u9ZzQl6mOYSb0R100AfF+YmyG1YS0ZVfRraNXvvDw=="
   }
 }
